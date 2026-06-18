@@ -65,14 +65,26 @@ export async function registrarEmpresa(formData: FormData) {
         }
       });
 
-      // 3. Clonar Roles para esta nueva empresa
+      // 3. Crear roles por defecto si no hay plantilla, o clonarlos si hay
+      const rolesPorDefecto = [
+        { nombre: "OWNER", descripcion: "Dueño del sistema" },
+        { nombre: "ADMIN", descripcion: "Administrador general" },
+        { nombre: "VENDEDOR", descripcion: "Ventas y caja" },
+        { nombre: "ALMACEN", descripcion: "Control de inventario" },
+        { nombre: "CONTADOR", descripcion: "Reportes financieros" }
+      ];
+
+      const rolesACrear = rolesPlantilla.length > 0 
+        ? rolesPlantilla 
+        : rolesPorDefecto;
+
       let ownerRolId = "";
-      for (const rolTpl of rolesPlantilla) {
+      for (const rolData of rolesACrear) {
         const nuevoRol = await tx.rol.create({
           data: {
             empresaId: empresa.id,
-            nombre: rolTpl.nombre,
-            descripcion: rolTpl.descripcion,
+            nombre: rolData.nombre,
+            descripcion: rolData.descripcion,
           }
         });
         if (nuevoRol.nombre === "OWNER") {
