@@ -10,7 +10,14 @@ export default function POSClient({ productos, clientes }: { productos: any[], c
   const router = useRouter();
   const [carrito, setCarrito] = useState<{id: string, nombre: string, cant: number, precio: number, stock: number}[]>([]);
   const [search, setSearch] = useState("");
+  
+  const [tipoComprobante, setTipoComprobante] = useState<"BOLETA" | "FACTURA">("BOLETA");
   const [clienteId, setClienteId] = useState<string | null>(null);
+  
+  // Para nuevo cliente rápido
+  const [documentoCliente, setDocumentoCliente] = useState("");
+  const [nombreCliente, setNombreCliente] = useState("");
+
   const [loading, setLoading] = useState(false);
 
   const filtrados = productos.filter(p => p.nombre.toLowerCase().includes(search.toLowerCase()));
@@ -56,11 +63,21 @@ export default function POSClient({ productos, clientes }: { productos: any[], c
 
   const emitirComprobante = async (metodoPago: string) => {
     if (carrito.length === 0) return toast.error("El carrito está vacío");
+    
+    if (tipoComprobante === "FACTURA") {
+      if (!clienteId && (!documentoCliente || !nombreCliente)) {
+        return toast.error("Para emitir FACTURA debe seleccionar o ingresar el RUC y Razón Social del cliente.");
+      }
+    }
+
     setLoading(true);
     const tId = toast.loading("Registrando venta...");
     try {
       await registrarVenta({
         clienteId: clienteId || undefined,
+        tipoComprobante,
+        documentoCliente: clienteId ? undefined : documentoCliente,
+        nombreCliente: clienteId ? undefined : nombreCliente,
         metodoPago,
         detalles: carrito.map(c => ({
           productoId: c.id,
@@ -71,7 +88,9 @@ export default function POSClient({ productos, clientes }: { productos: any[], c
       toast.success("¡Comprobante Emitido!", { id: tId, description: "La venta se guardó exitosamente y el stock fue descontado." });
       setCarrito([]);
       setClienteId(null);
-      router.refresh(); // Refresh stock in server
+      setDocumentoCliente("");
+      setNombreCliente("");
+      router.refresh(); 
     } catch (error: any) {
       toast.error("Error al registrar venta: " + error.message, { id: tId });
     } finally {
@@ -140,18 +159,54 @@ export default function POSClient({ productos, clientes }: { productos: any[], c
 
         {/* Ticket / Carrito Interactivo */}
         <div className="w-full lg:w-[400px] flex flex-col bg-background/30 border border-border/50 rounded-2xl overflow-hidden shadow-2xl shadow-black/20 shrink-0">
-          <div className="p-4 border-b border-border/50 bg-secondary/20 flex flex-col gap-2">
-            <label className="text-xs text-muted-foreground font-medium">Cliente:</label>
-            <select 
-              value={clienteId || ""} 
-              onChange={e => setClienteId(e.target.value || null)}
-              className="w-full bg-background border border-border/50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-            >
-              <option value="">Público en General</option>
-              {clientes.map(c => (
-                <option key={c.id} value={c.id}>{c.nombre} ({c.documento})</option>
-              ))}
-            </select>
+          <div className="p-4 border-b border-border/50 bg-secondary/20 flex flex-col gap-3">
+            
+            <div className="grid grid-cols-2 gap-2 bg-background/50 p-1 rounded-lg border border-border/50">
+              <button onClick={() => setTipoComprobante("BOLETA")} className={`py-1.5 text-sm font-bold rounded-md transition-colors ${tipoComprobante === "BOLETA" ? "bg-primary text-primary-foreground shadow" : "text-muted-foreground hover:text-foreground"}`}>BOLETA</button>
+              <button onClick={() => setTipoComprobante("FACTURA")} className={`py-1.5 text-sm font-bold rounded-md transition-colors ${tipoComprobante === "FACTURA" ? "bg-primary text-primary-foreground shadow" : "text-muted-foreground hover:text-foreground"}`}>FACTURA</button>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label className="text-xs text-muted-foreground font-medium">Cliente (Buscar existente):</label>
+              <select 
+                value={clienteId || ""} 
+                onChange={e => {
+                  setClienteId(e.target.value || null);
+                  if (e.target.value) { setDocumentoCliente(""); setNombreCliente(""); }
+                }}
+                className="w-full bg-background border border-border/50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                <option value="">Público en General / Nuevo</option>
+                {clientes.map(c => (
+                  <option key={c.id} value={c.id}>{c.nombre} ({c.documento})</option>
+                ))}
+              </select>
+            </div>
+
+            {!clienteId && (
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                <div>
+                  <label className="text-xs text-muted-foreground font-medium block mb-1">{tipoComprobante === "FACTURA" ? "RUC" : "DNI"}:</label>
+                  <input 
+                    type="text" 
+                    placeholder={tipoComprobante === "FACTURA" ? "20000000001" : "12345678"} 
+                    value={documentoCliente} 
+                    onChange={e => setDocumentoCliente(e.target.value)}
+                    className="w-full bg-background border border-border/50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary" 
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground font-medium block mb-1">{tipoComprobante === "FACTURA" ? "Razón Social" : "Nombre"}:</label>
+                  <input 
+                    type="text" 
+                    placeholder={tipoComprobante === "FACTURA" ? "Empresa SAC" : "Juan Perez"} 
+                    value={nombreCliente} 
+                    onChange={e => setNombreCliente(e.target.value)}
+                    className="w-full bg-background border border-border/50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary" 
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
