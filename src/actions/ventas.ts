@@ -13,7 +13,12 @@ export async function registrarVenta(data: {
 
   // Obtener sucursal del usuario
   const usuario = await prisma.usuario.findUnique({ where: { id: session!.user!.id }});
-  if (!usuario?.sucursalId) throw new Error("Usuario no asignado a sucursal");
+  let targetSucursalId = usuario?.sucursalId;
+  if (!targetSucursalId) {
+    const suc = await prisma.sucursal.findFirst({ where: { empresaId: (session?.user as any)?.empresaId }, orderBy: { createdAt: 'asc' } });
+    targetSucursalId = suc?.id;
+  }
+  if (!targetSucursalId) throw new Error("No hay sucursales disponibles en la empresa");
 
   const subtotal = data.detalles.reduce((acc, d) => acc + (d.cantidad * d.precio), 0);
   const igv = subtotal * 0.18;
@@ -26,7 +31,7 @@ export async function registrarVenta(data: {
     const nuevaVenta = await tx.venta.create({
       data: {
         empresaId: (session?.user as any)?.empresaId as string,
-        sucursalId: usuario.sucursalId!,
+        sucursalId: targetSucursalId,
         usuarioId: session!.user!.id as string,
         clienteId: data.clienteId,
         tipoComprobante: "BOLETA",
@@ -60,13 +65,13 @@ export async function registrarVenta(data: {
       await tx.inventarioSucursal.upsert({
         where: {
           sucursalId_productoId: {
-            sucursalId: usuario.sucursalId!,
+            sucursalId: targetSucursalId,
             productoId: det.productoId
           }
         },
         update: { stockActual: { decrement: det.cantidad } },
         create: {
-          sucursalId: usuario.sucursalId!,
+          sucursalId: targetSucursalId,
           productoId: det.productoId,
           stockActual: -det.cantidad // Queda negativo si venden sin stock previo registrado en esa sucursal
         }

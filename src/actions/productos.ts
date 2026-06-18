@@ -38,10 +38,16 @@ export async function crearProducto(data: any) {
       }
     });
 
-    if (data.stock !== undefined && data.stock !== null) {
+    let targetSucursalId = sucursalId;
+    if (!targetSucursalId) {
+      const suc = await tx.sucursal.findFirst({ where: { empresaId }, orderBy: { createdAt: 'asc' } });
+      targetSucursalId = suc?.id;
+    }
+
+    if (data.stock !== undefined && data.stock !== null && targetSucursalId) {
       await tx.inventarioSucursal.create({
         data: {
-          sucursalId,
+          sucursalId: targetSucursalId,
           productoId: prod.id,
           stockActual: parseInt(data.stock) || 0,
         }
@@ -71,12 +77,18 @@ export async function actualizarProducto(id: string, data: any) {
       }
     });
 
-    if (data.stock !== undefined && sucursalId) {
+    let targetSucursalId = sucursalId;
+    if (!targetSucursalId) {
+      const suc = await tx.sucursal.findFirst({ where: { empresaId: prod!.empresaId }, orderBy: { createdAt: 'asc' } });
+      targetSucursalId = suc?.id;
+    }
+
+    if (data.stock !== undefined && targetSucursalId) {
       // Necesitamos upsert o buscar primero si existe porque prisma no generó sucursalId_productoId unique constraint
       // Revisando schema, model InventarioSucursal no tiene @@unique([sucursalId, productoId]).
       // Si no la tiene, debemos buscar y luego update/create
       const inv = await tx.inventarioSucursal.findFirst({
-        where: { sucursalId, productoId: id }
+        where: { sucursalId: targetSucursalId, productoId: id }
       });
 
       if (inv) {
@@ -87,7 +99,7 @@ export async function actualizarProducto(id: string, data: any) {
       } else {
         await tx.inventarioSucursal.create({
           data: {
-            sucursalId,
+            sucursalId: targetSucursalId,
             productoId: id,
             stockActual: parseInt(data.stock) || 0
           }
