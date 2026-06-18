@@ -38,3 +38,15 @@ export async function actualizarCliente(id: string, data: any) {
     data
   });
 }
+
+export async function eliminarCliente(id: string) {
+  const session = await auth();
+  if (!(session?.user as any)?.empresaId) throw new Error("No autenticado");
+
+  const cli = await prisma.cliente.findUnique({ where: { id } });
+  if (cli?.empresaId !== (session?.user as any)?.empresaId) throw new Error("Acceso denegado");
+
+  return prisma.cliente.delete({
+    where: { id }
+  });
+}

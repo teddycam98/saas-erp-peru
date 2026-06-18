@@ -1,0 +1,1 @@
+const { PrismaClient } = require(" @prisma/client\); const prisma = new PrismaClient(); async function main() { try { const e = await prisma.empresa.findFirst(); console.log(\Success:\, e ? e.id : \No hay empresas\); } catch(err) { console.error(\DB Error:\, err); } finally { await prisma.$disconnect(); } } main();
