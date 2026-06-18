@@ -1,34 +1,29 @@
 "use server";
 import { prisma } from "@/lib/prisma";
-import { revalidatePath } from "next/cache";
+import { auth } from "@/auth";
 
-export async function getEmpresaBySubdomain(subdominio: string) {
-  try {
-    const empresa = await prisma.empresa.findUnique({
-      where: { subdominio }
-    });
-    return { success: true, data: empresa };
-  } catch (error) {
-    return { success: false, error: "Error al obtener empresa" };
-  }
+export async function getEmpresa() {
+  const session = await auth();
+  if (!(session?.user as any)?.empresaId) throw new Error("No autenticado");
+
+  return prisma.empresa.findUnique({
+    where: { id: (session?.user as any)?.empresaId }
+  });
 }
 
-export async function updateEmpresaData(id: string, data: any, domain: string) {
-  try {
-    const empresa = await prisma.empresa.update({
-      where: { id },
-      data: {
-        razonSocial: data.razonSocial,
-        nombreComercial: data.nombreComercial,
-        ruc: data.ruc,
-        direccion: data.direccion,
-        emailContacto: data.emailContacto,
-        telefono: data.telefono,
-      }
-    });
-    revalidatePath(`/${domain}/settings`, "layout");
-    return { success: true, data: empresa };
-  } catch (error) {
-    return { success: false, error: "Error al actualizar la empresa" };
-  }
+export async function actualizarEmpresa(id: string, data: any) {
+  const session = await auth();
+  if ((session?.user as any)?.empresaId !== id) throw new Error("Acceso denegado");
+
+  return prisma.empresa.update({
+    where: { id },
+    data: {
+      razonSocial: data.razonSocial,
+      nombreComercial: data.nombreComercial,
+      ruc: data.ruc,
+      direccion: data.direccion,
+      emailContacto: data.emailContacto,
+      telefono: data.telefono,
+    }
+  });
 }
