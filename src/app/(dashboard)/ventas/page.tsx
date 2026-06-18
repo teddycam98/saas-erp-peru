@@ -1,25 +1,13 @@
-import POSClient from "./pos-client";
-import { getProductos } from "@/actions/productos";
-import { getClientes } from "@/actions/clientes";
-
-export default async function POSPage() {
-  const productos = await getProductos();
-  const clientes = await getClientes();
-  
-  // Transformar datos para el cliente
-  const dataProductos = productos.map(p => ({
-    id: p.id,
-    nombre: p.nombre,
-    precio: Number(p.precioVenta),
-    img: p.nombre.substring(0, 2).toUpperCase(),
-    stock: p.inventarios[0]?.stockActual || 0
-  }));
-
-  const dataClientes = clientes.map(c => ({
-    id: c.id,
-    nombre: c.nombre,
-    documento: c.numeroDocumento
-  }));
-
-  return <POSClient productos={dataProductos} clientes={dataClientes} />;
+export default function VentasHistoryPage() {
+  return (
+    <div className="space-y-6">
+      <div className="border-b border-border/50 pb-4">
+        <h2 className="text-xl font-heading font-bold">Historial de Ventas</h2>
+        <p className="text-sm text-muted-foreground">Aquí aparecerá la lista de ventas realizadas.</p>
+      </div>
+      <div className="p-6 bg-background/50 border border-border/50 rounded-xl text-center">
+        <p className="text-muted-foreground">Módulo en construcción. Para vender, dirígete al Punto de Venta.</p>
+      </div>
+    </div>
+  );
 }
