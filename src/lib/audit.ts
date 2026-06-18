@@ -13,9 +13,9 @@ export async function logAudit(
         empresaId,
         usuarioId,
         accion,
-        entidad,
-        detalles: JSON.stringify(detalles),
-        ipAddress: "127.0.0.1", // En producción se obtiene del request
+        tablaAfectada: entidad,
+        detalles,
+        ip: "127.0.0.1", // En producción se obtiene del request
       }
     });
   } catch (error) {

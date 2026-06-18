@@ -18,7 +18,7 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
 
         const user = await prisma.usuario.findFirst({
           where: { email: credentials.email as string },
-          include: { empresa: true }
+          include: { empresa: true, rol: true }
         });
 
         if (!user || !user.estado) return null;

@@ -8,7 +8,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname();
   const { data: session, status } = useSession();
   
-  const domain = session?.user?.subdominio || "Cargando...";
+  const domain = (session?.user as any)?.subdominio || "Cargando...";
 
   const routes = [
     { name: "Dashboard", href: `/dashboard`, icon: LayoutDashboard },

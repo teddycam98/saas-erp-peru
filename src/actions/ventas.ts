@@ -9,10 +9,10 @@ export async function registrarVenta(data: {
   metodoPago: string;
 }) {
   const session = await auth();
-  if (!session?.user?.empresaId) throw new Error("No autenticado");
+  if (!(session?.user as any)?.empresaId) throw new Error("No autenticado");
 
   // Obtener sucursal del usuario
-  const usuario = await prisma.usuario.findUnique({ where: { id: session.user.id }});
+  const usuario = await prisma.usuario.findUnique({ where: { id: session!.user!.id }});
   if (!usuario?.sucursalId) throw new Error("Usuario no asignado a sucursal");
 
   const subtotal = data.detalles.reduce((acc, d) => acc + (d.cantidad * d.precio), 0);
@@ -25,9 +25,9 @@ export async function registrarVenta(data: {
     // 1. Crear cabecera
     const nuevaVenta = await tx.venta.create({
       data: {
-        empresaId: session.user.empresaId as string,
-        sucursalId: usuario.sucursalId,
-        usuarioId: session.user.id,
+        empresaId: (session?.user as any)?.empresaId as string,
+        sucursalId: usuario.sucursalId!,
+        usuarioId: session!.user!.id as string,
         clienteId: data.clienteId,
         tipoComprobante: "BOLETA",
         serie: "B001",
@@ -47,29 +47,26 @@ export async function registrarVenta(data: {
           productoId: det.productoId,
           cantidad: det.cantidad,
           precioUnitario: det.precio,
-          subtotal: det.cantidad * det.precio,
-          igv: (det.cantidad * det.precio) * 0.18,
+          
+          
           total: (det.cantidad * det.precio) * 1.18,
         }
       });
 
       // 3. Descontar Stock Global
-      await tx.producto.update({
-        where: { id: det.productoId },
-        data: { stockGlobal: { decrement: det.cantidad } }
-      });
+      // 4. Actualizar Inventario Sucursal
 
       // 4. Actualizar Inventario Sucursal
-      await tx.inventario.upsert({
+      await tx.inventarioSucursal.upsert({
         where: {
           sucursalId_productoId: {
-            sucursalId: usuario.sucursalId,
+            sucursalId: usuario.sucursalId!,
             productoId: det.productoId
           }
         },
         update: { stockActual: { decrement: det.cantidad } },
         create: {
-          sucursalId: usuario.sucursalId,
+          sucursalId: usuario.sucursalId!,
           productoId: det.productoId,
           stockActual: -det.cantidad // Queda negativo si venden sin stock previo registrado en esa sucursal
         }

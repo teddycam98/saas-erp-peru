@@ -39,9 +39,9 @@ export async function emitirComprobanteNubefact(ventaId: string) {
         cantidad: det.cantidad,
         valor_unitario: Number(det.precioUnitario) / 1.18,
         precio_unitario: Number(det.precioUnitario),
-        subtotal: Number(det.subtotal),
+        subtotal: (Number(det.total) / 1.18),
         tipo_de_igv: 1,
-        igv: Number(det.igv),
+        igv: (Number(det.total) - (Number(det.total) / 1.18)),
         total: Number(det.total),
         anticipo_regularizacion: false
       }))
@@ -63,11 +63,11 @@ export async function emitirComprobanteNubefact(ventaId: string) {
     await prisma.venta.update({
       where: { id: ventaId },
       data: {
-        estadoSunat: data.aceptada_por_sunat ? "ACEPTADO_SUNAT" : "EMITIDO",
+        estadoSunat: data.aceptada_por_sunat ? "ACEPTADO" : "ENVIADO",
         xmlUrl: data.enlace_del_xml,
         pdfUrl: data.enlace_del_pdf,
         cdrUrl: data.enlace_del_cdr,
-        mensajeSunat: data.sunat_description
+        
       }
     });
 

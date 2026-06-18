@@ -5,14 +5,14 @@ import { DollarSign, ShoppingBag, Users, TrendingUp } from "lucide-react";
 export default async function DashboardPage() {
   const session = await auth();
   
-  if (!session?.user?.empresaId) {
+  if (!(session?.user as any)?.empresaId) {
     return <div>Acceso Denegado</div>;
   }
 
   // Ejemplo de consultas reales multi-tenant
   const [totalProductos, totalClientes] = await Promise.all([
-    prisma.producto.count({ where: { empresaId: session.user.empresaId as string } }),
-    prisma.cliente.count({ where: { empresaId: session.user.empresaId as string } })
+    prisma.producto.count({ where: { empresaId: (session?.user as any)?.empresaId as string } }),
+    prisma.cliente.count({ where: { empresaId: (session?.user as any)?.empresaId as string } })
   ]);
 
   return (

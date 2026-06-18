@@ -1,41 +1,42 @@
-import { Rol } from "@prisma/client";
+type RoleType = "OWNER" | "ADMIN" | "VENDEDOR" | "ALMACEN" | "CONTADOR";
 
 export const PERMISSIONS = {
-  VIEW_DASHBOARD: [Rol.OWNER, Rol.ADMIN, Rol.VENDEDOR, Rol.ALMACEN, Rol.CONTADOR],
+  VIEW_DASHBOARD: ["OWNER", "ADMIN", "VENDEDOR", "ALMACEN", "CONTADOR"],
   
   // Usuarios
-  MANAGE_USERS: [Rol.OWNER, Rol.ADMIN],
+  MANAGE_USERS: ["OWNER", "ADMIN"],
   
   // Configuracion Empresa
-  MANAGE_SETTINGS: [Rol.OWNER],
-  MANAGE_SUBSCRIPTION: [Rol.OWNER],
+  MANAGE_SETTINGS: ["OWNER"],
+  MANAGE_SUBSCRIPTION: ["OWNER"],
   
   // Productos e Inventario
-  MANAGE_PRODUCTS: [Rol.OWNER, Rol.ADMIN, Rol.ALMACEN],
-  VIEW_PRODUCTS: [Rol.OWNER, Rol.ADMIN, Rol.VENDEDOR, Rol.ALMACEN, Rol.CONTADOR],
-  MANAGE_INVENTORY: [Rol.OWNER, Rol.ADMIN, Rol.ALMACEN],
+  MANAGE_PRODUCTS: ["OWNER", "ADMIN", "ALMACEN"],
+  VIEW_PRODUCTS: ["OWNER", "ADMIN", "VENDEDOR", "ALMACEN", "CONTADOR"],
+  MANAGE_INVENTORY: ["OWNER", "ADMIN", "ALMACEN"],
   
   // Ventas y POS
-  MANAGE_SALES: [Rol.OWNER, Rol.ADMIN, Rol.VENDEDOR],
-  ISSUE_INVOICES: [Rol.OWNER, Rol.ADMIN, Rol.VENDEDOR],
+  MANAGE_SALES: ["OWNER", "ADMIN", "VENDEDOR"],
+  ISSUE_INVOICES: ["OWNER", "ADMIN", "VENDEDOR"],
   
   // Compras y Proveedores
-  MANAGE_PURCHASES: [Rol.OWNER, Rol.ADMIN, Rol.ALMACEN],
+  MANAGE_PURCHASES: ["OWNER", "ADMIN", "ALMACEN"],
   
   // Reportes y Analitica (IA)
-  VIEW_REPORTS: [Rol.OWNER, Rol.ADMIN, Rol.CONTADOR],
+  VIEW_REPORTS: ["OWNER", "ADMIN", "CONTADOR"],
   
   // CRM
-  MANAGE_CRM: [Rol.OWNER, Rol.ADMIN, Rol.VENDEDOR],
+  MANAGE_CRM: ["OWNER", "ADMIN", "VENDEDOR"],
 } as const;
 
 export type Permission = keyof typeof PERMISSIONS;
 
-export function hasPermission(userRole: Rol, permission: Permission): boolean {
-  return PERMISSIONS[permission].includes(userRole);
+export function hasPermission(userRole: string | any, permission: Permission): boolean {
+  if (!userRole || typeof userRole !== "string") return false;
+  return (PERMISSIONS[permission] as readonly string[]).includes(userRole);
 }
 
-export function assertPermission(userRole: Rol, permission: Permission) {
+export function assertPermission(userRole: string | any, permission: Permission) {
   if (!hasPermission(userRole, permission)) {
     throw new Error(`Unauthorized: Role ${userRole} lacks permission ${permission}`);
   }
