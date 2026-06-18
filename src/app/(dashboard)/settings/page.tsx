@@ -3,12 +3,7 @@ import { Building2 } from "lucide-react";
 import { toast } from "sonner";
 import { use } from "react";
 
-export default function SettingsGeneralPage({
-  params
-}: {
-  params: Promise<{ domain: string }>;
-}) {
-  const resolvedParams = use(params);
+export default function SettingsGeneralPage() {
 
   return (
     <div className="space-y-6">

@@ -1,14 +1,11 @@
 import Link from "next/link";
 import { Box, MapPin, Users, CreditCard } from "lucide-react";
 
-export default async function SettingsLayout({
-  children,
-  params
+export default function SettingsLayout({
+  children
 }: {
   children: React.ReactNode;
-  params: Promise<{ domain: string }>;
 }) {
-  const { domain } = await params;
   
   const tabs = [
     { label: "General", href: `/settings`, icon: Box },
