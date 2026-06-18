@@ -33,6 +33,7 @@ export async function crearProducto(data: any) {
         codigo: data.codigo,
         nombre: data.nombre,
         precioVenta: data.precioVenta,
+        precioCompra: data.precioVenta * 0.7, // Valor por defecto
         categoriaId: data.categoriaId || null,
       }
     });
@@ -40,11 +41,9 @@ export async function crearProducto(data: any) {
     if (data.stock !== undefined && data.stock !== null) {
       await tx.inventarioSucursal.create({
         data: {
-          empresaId,
           sucursalId,
           productoId: prod.id,
-          cantidad: parseInt(data.stock) || 0,
-          stockMinimo: 5
+          stockActual: parseInt(data.stock) || 0,
         }
       });
     }
@@ -72,19 +71,28 @@ export async function actualizarProducto(id: string, data: any) {
       }
     });
 
-    if (data.stock !== undefined) {
-      await tx.inventarioSucursal.upsert({
-        where: { sucursalId_productoId: { sucursalId, productoId: id } },
-        create: {
-          empresaId: prod.empresaId,
-          sucursalId,
-          productoId: id,
-          cantidad: parseInt(data.stock) || 0,
-        },
-        update: {
-          cantidad: parseInt(data.stock) || 0,
-        }
+    if (data.stock !== undefined && sucursalId) {
+      // Necesitamos upsert o buscar primero si existe porque prisma no generó sucursalId_productoId unique constraint
+      // Revisando schema, model InventarioSucursal no tiene @@unique([sucursalId, productoId]).
+      // Si no la tiene, debemos buscar y luego update/create
+      const inv = await tx.inventarioSucursal.findFirst({
+        where: { sucursalId, productoId: id }
       });
+
+      if (inv) {
+        await tx.inventarioSucursal.update({
+          where: { id: inv.id },
+          data: { stockActual: parseInt(data.stock) || 0 }
+        });
+      } else {
+        await tx.inventarioSucursal.create({
+          data: {
+            sucursalId,
+            productoId: id,
+            stockActual: parseInt(data.stock) || 0
+          }
+        });
+      }
     }
 
     return updated;

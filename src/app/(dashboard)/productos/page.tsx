@@ -11,8 +11,8 @@ export default async function ProductosPage() {
     nombre: p.nombre,
     categoria: p.categoria?.nombre || "General",
     precio: Number(p.precioVenta),
-    stock: p.inventarios[0]?.cantidad || 0,
-    estado: p.inventarios[0]?.cantidad > 15 ? "Activo" : (p.inventarios[0]?.cantidad > 0 ? "Bajo Stock" : "Agotado")
+    stock: p.inventarios[0]?.stockActual || 0,
+    estado: p.inventarios[0]?.stockActual > 15 ? "Activo" : (p.inventarios[0]?.stockActual > 0 ? "Bajo Stock" : "Agotado")
   }));
 
   return <ProductosClient initialData={data} />;

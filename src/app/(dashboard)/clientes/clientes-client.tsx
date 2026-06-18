@@ -24,7 +24,7 @@ export default function ClientesClient({ initialData }: { initialData: any[] }) 
       if (nuevoCli.id) {
         await actualizarCliente(nuevoCli.id, {
           nombre: nuevoCli.nombre,
-          documento: nuevoCli.doc,
+          numeroDocumento: nuevoCli.doc,
           tipoDocumento: nuevoCli.tipo,
           email: nuevoCli.email,
           telefono: nuevoCli.telf,
@@ -33,7 +33,7 @@ export default function ClientesClient({ initialData }: { initialData: any[] }) 
       } else {
         await crearCliente({
           nombre: nuevoCli.nombre,
-          documento: nuevoCli.doc,
+          numeroDocumento: nuevoCli.doc,
           tipoDocumento: nuevoCli.tipo,
           email: nuevoCli.email,
           telefono: nuevoCli.telf,

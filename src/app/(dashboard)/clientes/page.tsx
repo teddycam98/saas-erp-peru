@@ -8,7 +8,8 @@ export default async function ClientesPage() {
   const data = clientes.map(c => ({
     id: c.id,
     nombre: c.nombre,
-    documento: c.documento || "",
+    documento: c.numeroDocumento || "",
+    tipoDocumento: c.tipoDocumento || "DNI",
     email: c.email || "",
     telefono: c.telefono || "",
     estado: "Activo" // O lógica personalizada
