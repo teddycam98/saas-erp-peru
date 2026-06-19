@@ -81,21 +81,34 @@
   }
   body {
     @apply text-foreground font-sans antialiased selection:bg-primary/30;
-    background-color: #030303;
-    background-image: 
-      radial-gradient(circle at 10% 20%, rgba(20, 90, 50, 0.3) 0%, transparent 40%),
-      radial-gradient(circle at 35% 10%, rgba(184, 134, 11, 0.25) 0%, transparent 45%),
-      radial-gradient(circle at 65% 10%, rgba(153, 0, 0, 0.35) 0%, transparent 45%),
-      radial-gradient(circle at 90% 20%, rgba(21, 67, 96, 0.35) 0%, transparent 40%);
-    background-attachment: fixed;
-    background-size: 200% 200%;
-    animation: moveGlow 15s ease-in-out infinite alternate;
+    background-color: #000000;
     min-height: 100vh;
+    overflow-x: hidden;
   }
-  @keyframes moveGlow {
-    0% { background-position: 0% 0%; }
-    50% { background-position: 100% 10%; }
-    100% { background-position: 0% 0%; }
+
+  body::before {
+    content: "";
+    position: fixed;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background-image: 
+      radial-gradient(circle at 50% 35%, rgba(0, 162, 255, 0.45) 0%, transparent 25%),
+      radial-gradient(circle at 65% 50%, rgba(255, 0, 128, 0.4) 0%, transparent 30%),
+      radial-gradient(circle at 35% 50%, rgba(0, 255, 136, 0.4) 0%, transparent 30%),
+      radial-gradient(circle at 50% 65%, rgba(255, 170, 0, 0.4) 0%, transparent 25%);
+    background-size: 100% 100%;
+    animation: rotateGlow 20s ease-in-out infinite alternate;
+    z-index: -1;
+    pointer-events: none;
+    filter: blur(80px);
+  }
+
+  @keyframes rotateGlow {
+    0% { transform: rotate(0deg) scale(1); }
+    50% { transform: rotate(180deg) scale(1.2); }
+    100% { transform: rotate(360deg) scale(1); }
   }
   h1, h2, h3, h4, h5, h6 {
     @apply font-heading tracking-tight;
