@@ -148,7 +148,7 @@ export default function POSClient({ productos, clientes, categorias }: { product
           </div>
         </div>
         <div className="flex-1 overflow-y-auto p-3">
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-2.5">
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3">
             {filtrados.map(p => (
               <button
                 key={p.id}
@@ -156,7 +156,7 @@ export default function POSClient({ productos, clientes, categorias }: { product
                 disabled={p.stock <= 0}
                 className={`flex flex-col rounded-xl border transition-all text-left group ${p.stock <= 0 ? "opacity-40 cursor-not-allowed border-border/30" : "border-border/50 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5 active:scale-[0.97]"}`}
               >
-                <div className="h-28 bg-secondary/30 flex items-center justify-center text-lg font-bold text-muted-foreground/50 font-heading relative rounded-t-xl overflow-hidden group-hover:opacity-90 transition-opacity">
+                <div className="h-40 bg-secondary/30 flex items-center justify-center text-2xl font-bold text-muted-foreground/50 font-heading relative rounded-t-xl overflow-hidden group-hover:opacity-90 transition-opacity">
                   {p.imageUrl ? (
                     <img src={p.imageUrl} alt={p.nombre} className="w-full h-full object-cover" />
                   ) : (
