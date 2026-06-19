@@ -91,25 +91,26 @@
 
   .google-ai-bg {
     position: fixed;
-    top: -10%;
-    left: -10%;
-    width: 120%;
-    height: 100vh;
+    top: -20px;
+    left: 0;
+    width: 100vw;
+    height: 350px;
     background-image: 
-      radial-gradient(ellipse at 15% 20%, rgba(0, 255, 100, 0.75) 0%, transparent 55%),
-      radial-gradient(circle at 35% 25%, rgba(255, 180, 0, 0.8) 0%, transparent 60%),
-      radial-gradient(ellipse at 60% 20%, rgba(255, 0, 100, 0.8) 0%, transparent 60%),
-      radial-gradient(circle at 85% 25%, rgba(0, 100, 255, 0.75) 0%, transparent 65%);
+      radial-gradient(ellipse at 15% 0%, rgba(0, 255, 100, 0.8) 0%, transparent 50%),
+      radial-gradient(ellipse at 40% 0%, rgba(255, 180, 0, 0.8) 0%, transparent 60%),
+      radial-gradient(ellipse at 60% 0%, rgba(255, 0, 100, 0.8) 0%, transparent 60%),
+      radial-gradient(ellipse at 85% 0%, rgba(0, 100, 255, 0.8) 0%, transparent 50%);
     z-index: -50;
     pointer-events: none;
-    filter: blur(100px);
-    animation: auroraMovement 12s ease-in-out infinite alternate;
+    filter: blur(80px);
+    opacity: 0.8;
+    animation: auroraMovement 8s ease-in-out infinite alternate;
   }
 
   @keyframes auroraMovement {
-    0% { transform: translate(-2%, -2%) scale(1); }
-    50% { transform: translate(3%, 3%) scale(1.08); }
-    100% { transform: translate(-1%, 1%) scale(1.15); }
+    0% { transform: translateX(-2%) scaleX(1); }
+    50% { transform: translateX(2%) scaleX(1.05); }
+    100% { transform: translateX(-1%) scaleX(1.1); }
   }
   h1, h2, h3, h4, h5, h6 {
     @apply font-heading tracking-tight;
