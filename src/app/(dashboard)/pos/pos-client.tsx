@@ -5,10 +5,10 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { registrarVenta } from "@/actions/ventas";
 
-interface Producto { id: string; nombre: string; codigo: string; precio: number; costo: number; categoriaId: string; categoriaNombre: string; img: string; stock: number; }
+interface Producto { id: string; nombre: string; codigo: string; descripcion?: string; precio: number; costo: number; categoriaId: string; categoriaNombre: string; img: string; imageUrl?: string; stock: number; }
 interface Cliente { id: string; nombre: string; documento: string; tipoDocumento: string; }
 interface Categoria { id: string; nombre: string; }
-interface CartItem { id: string; nombre: string; cant: number; precio: number; stock: number; }
+interface CartItem { id: string; nombre: string; cant: number; precio: number; stock: number; imageUrl?: string; }
 
 const METODOS_PAGO = [
   { id: "EFECTIVO", label: "Efectivo", icon: Banknote, color: "emerald" },
@@ -40,15 +40,14 @@ export default function POSClient({ productos, clientes, categorias }: { product
     });
   }, [productos, search, catFilter]);
 
-  const addToCart = (prod: Producto) => {
-    if (prod.stock <= 0) return toast.error("Sin stock");
+  const addToCart = (p: Producto) => {
     setCarrito(prev => {
-      const exists = prev.find(i => i.id === prod.id);
-      if (exists) {
-        if (exists.cant >= prod.stock) { toast.error("Stock insuficiente"); return prev; }
-        return prev.map(i => i.id === prod.id ? { ...i, cant: i.cant + 1 } : i);
+      const ex = prev.find(i => i.id === p.id);
+      if (ex) {
+        if (ex.cant >= p.stock) { toast.error("Stock insuficiente"); return prev; }
+        return prev.map(i => i.id === p.id ? { ...i, cant: i.cant + 1 } : i);
       }
-      return [...prev, { id: prod.id, nombre: prod.nombre, cant: 1, precio: prod.precio, stock: prod.stock }];
+      return [...prev, { id: p.id, nombre: p.nombre, cant: 1, precio: p.precio, stock: p.stock, imageUrl: p.imageUrl }];
     });
   };
 
@@ -157,15 +156,23 @@ export default function POSClient({ productos, clientes, categorias }: { product
                 disabled={p.stock <= 0}
                 className={`flex flex-col rounded-xl border transition-all text-left group ${p.stock <= 0 ? "opacity-40 cursor-not-allowed border-border/30" : "border-border/50 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5 active:scale-[0.97]"}`}
               >
-                <div className="h-16 bg-secondary/30 flex items-center justify-center text-lg font-bold text-muted-foreground/50 font-heading relative rounded-t-xl">
-                  {p.img}
-                  <span className={`absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold ${p.stock <= 5 ? "bg-red-500/20 text-red-400" : "bg-secondary text-muted-foreground"}`}>
+                <div className="h-28 bg-secondary/30 flex items-center justify-center text-lg font-bold text-muted-foreground/50 font-heading relative rounded-t-xl overflow-hidden group-hover:opacity-90 transition-opacity">
+                  {p.imageUrl ? (
+                    <img src={p.imageUrl} alt={p.nombre} className="w-full h-full object-cover" />
+                  ) : (
+                    p.img
+                  )}
+                  <span className={`absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold z-10 ${p.stock <= 5 ? "bg-red-500/90 text-white" : "bg-black/50 text-white backdrop-blur-md"}`}>
                     {p.stock}
                   </span>
                 </div>
-                <div className="p-2.5">
-                  <p className="text-xs font-medium text-foreground line-clamp-2 leading-tight">{p.nombre}</p>
-                  <p className="text-primary font-bold text-sm mt-1">S/ {p.precio.toFixed(2)}</p>
+                <div className="p-2.5 flex-1 flex flex-col justify-between">
+                  <div>
+                    {p.codigo && <p className="text-[10px] font-mono text-muted-foreground mb-0.5">{p.codigo}</p>}
+                    <p className="text-xs font-medium text-foreground line-clamp-2 leading-tight">{p.nombre}</p>
+                    {p.descripcion && <p className="text-[10px] text-muted-foreground mt-1 line-clamp-1" title={p.descripcion}>{p.descripcion}</p>}
+                  </div>
+                  <p className="text-primary font-bold text-sm mt-2">S/ {p.precio.toFixed(2)}</p>
                 </div>
               </button>
             ))}
@@ -209,6 +216,9 @@ export default function POSClient({ productos, clientes, categorias }: { product
             </div>
           ) : carrito.map(item => (
             <div key={item.id} className="flex items-center gap-2 p-2 bg-secondary/20 rounded-lg border border-border/30 group">
+              <div className="w-10 h-10 rounded-md bg-secondary flex items-center justify-center shrink-0 overflow-hidden">
+                {item.imageUrl ? <img src={item.imageUrl} alt={item.nombre} className="w-full h-full object-cover" /> : <div className="text-[10px] font-bold text-muted-foreground">{item.nombre.substring(0, 2).toUpperCase()}</div>}
+              </div>
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-medium text-foreground truncate">{item.nombre}</p>
                 <p className="text-[10px] text-muted-foreground">S/ {item.precio.toFixed(2)} c/u</p>

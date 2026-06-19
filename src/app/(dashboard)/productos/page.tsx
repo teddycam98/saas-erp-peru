@@ -23,6 +23,7 @@ export default async function ProductosPage() {
     stock: p.inventarios?.[0]?.stockActual ?? 0,
     stockMinimo: p.stockMinimo || 0,
     estado: p.estado,
+    imageUrl: p.imageUrl || "",
   }));
 
   const cats = categorias.map((c: any) => ({ id: c.id, nombre: c.nombre }));

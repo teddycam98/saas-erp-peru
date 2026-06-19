@@ -5,11 +5,11 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { crearProducto, actualizarProducto, eliminarProducto, crearCategoria, actualizarCategoria, eliminarCategoria, crearMarca, actualizarMarca, eliminarMarca } from "@/actions/productos";
 
-interface Prod { id: string; codigo: string; codigoBarras: string; nombre: string; descripcion: string; categoriaId: string; categoriaNombre: string; marcaId: string; marcaNombre: string; precioCompra: number; precioVenta: number; stock: number; stockMinimo: number; estado: boolean; }
+interface Prod { id: string; codigo: string; codigoBarras: string; nombre: string; descripcion: string; categoriaId: string; categoriaNombre: string; marcaId: string; marcaNombre: string; precioCompra: number; precioVenta: number; stock: number; stockMinimo: number; estado: boolean; imageUrl: string; }
 interface Cat { id: string; nombre: string; }
 interface Marca { id: string; nombre: string; }
 
-const emptyForm = { id: "", codigo: "", codigoBarras: "", nombre: "", descripcion: "", categoriaId: "", marcaId: "", precioVenta: "", stock: "" };
+const emptyForm = { id: "", codigo: "", codigoBarras: "", nombre: "", descripcion: "", categoriaId: "", marcaId: "", precioVenta: "", stock: "", imageUrl: "" };
 
 export default function ProductosClient({ initialData, categorias, marcas }: { initialData: Prod[]; categorias: Cat[]; marcas: Marca[] }) {
   const router = useRouter();
@@ -44,6 +44,7 @@ export default function ProductosClient({ initialData, categorias, marcas }: { i
         marcaId: form.marcaId || undefined,
         precioVenta: parseFloat(form.precioVenta) || 0,
         stockInicial: parseInt(form.stock) || 0,
+        imageUrl: form.imageUrl || undefined,
         afectoIGV: true,
       };
       if (form.id) {
@@ -101,7 +102,7 @@ export default function ProductosClient({ initialData, categorias, marcas }: { i
   };
 
   const openEdit = (p: Prod) => {
-    setForm({ id: p.id, codigo: p.codigo, codigoBarras: p.codigoBarras, nombre: p.nombre, descripcion: p.descripcion, categoriaId: p.categoriaId, marcaId: p.marcaId, precioVenta: p.precioVenta.toString(), stock: p.stock.toString() });
+    setForm({ id: p.id, codigo: p.codigo, codigoBarras: p.codigoBarras, nombre: p.nombre, descripcion: p.descripcion, categoriaId: p.categoriaId, marcaId: p.marcaId, precioVenta: p.precioVenta.toString(), stock: p.stock.toString(), imageUrl: p.imageUrl || "" });
     setShowModal(true);
   };
 
@@ -177,8 +178,14 @@ export default function ProductosClient({ initialData, categorias, marcas }: { i
                       <tr key={p.id} className="hover:bg-secondary/20 transition-colors">
                         <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{p.codigo || "—"}</td>
                         <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center shrink-0"><Package className="w-4 h-4 text-muted-foreground" /></div>
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center shrink-0 overflow-hidden border border-border/50">
+                              {p.imageUrl ? (
+                                <img src={p.imageUrl} alt={p.nombre} className="w-full h-full object-cover" />
+                              ) : (
+                                <Package className="w-5 h-5 text-muted-foreground" />
+                              )}
+                            </div>
                             <div><p className="text-xs font-medium">{p.nombre}</p>{p.marcaNombre && <p className="text-[10px] text-muted-foreground">{p.marcaNombre}</p>}</div>
                           </div>
                         </td>
@@ -252,6 +259,7 @@ export default function ProductosClient({ initialData, categorias, marcas }: { i
                 <div><label className="text-xs font-medium mb-1 block">Precio Final S/ * <span className="text-[10px] text-muted-foreground ml-1">(Inc. IGV)</span></label><input required type="number" step="0.01" value={form.precioVenta} onChange={e => setForm({...form, precioVenta: e.target.value})} className="w-full bg-background border border-border/50 rounded-lg px-3 py-2 text-sm text-emerald-400 font-bold" /></div>
                 <div><label className="text-xs font-medium mb-1 block">Stock Actual</label><input type="number" value={form.stock} onChange={e => setForm({...form, stock: e.target.value})} className="w-full bg-background border border-border/50 rounded-lg px-3 py-2 text-sm" /></div>
               </div>
+              <div><label className="text-xs font-medium mb-1 block">URL de Imagen</label><input type="url" value={form.imageUrl} onChange={e => setForm({...form, imageUrl: e.target.value})} placeholder="https://..." className="w-full bg-background border border-border/50 rounded-lg px-3 py-2 text-sm" /></div>
               <button type="submit" disabled={loading} className="w-full bg-primary text-white py-2.5 rounded-xl font-bold text-sm mt-2 flex items-center justify-center gap-2 disabled:opacity-50 hover:bg-primary/90 shadow-[0_0_15px_rgba(124,58,237,0.3)]">
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (form.id ? "Guardar Cambios" : "Crear Producto")}
               </button>

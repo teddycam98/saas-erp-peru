@@ -18,6 +18,8 @@ export default async function POSPage() {
     categoriaId: p.categoriaId || "",
     categoriaNombre: p.categoria?.nombre || "General",
     img: p.nombre.substring(0, 2).toUpperCase(),
+    imageUrl: p.imageUrl || "",
+    descripcion: p.descripcion || "",
     stock: p.inventarios?.[0]?.stockActual ?? 0,
   }));
 
