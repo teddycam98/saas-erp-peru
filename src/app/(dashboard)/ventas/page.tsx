@@ -1,8 +1,10 @@
 import VentasClient from "./ventas-client";
 import { getVentas } from "@/actions/ventas";
+import { getEmpresa } from "@/actions/empresa";
 
 export default async function VentasPage() {
   const ventas = await getVentas();
+  const empresa = await getEmpresa();
 
   const data = ventas.ventas.map((v: any) => ({
     id: v.id,
@@ -28,5 +30,5 @@ export default async function VentasPage() {
     })),
   }));
 
-  return <VentasClient initialData={data} />;
+  return <VentasClient initialData={data} empresa={empresa} />;
 }

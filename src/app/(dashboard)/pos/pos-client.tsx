@@ -76,7 +76,8 @@ export default function POSClient({ productos, clientes, categorias }: { product
     if (tipoComprobante === "FACTURA" && !clienteId && (!docCliente || !nombreCliente)) {
       return toast.error("Para FACTURA ingrese RUC y Razón Social");
     }
-    if (metodoPago === "EFECTIVO" && montoRec < total) {
+    const montoPagado = montoRecibido ? montoRec : total;
+    if (metodoPago === "EFECTIVO" && montoPagado + 0.01 < total) {
       return toast.error("El monto recibido es insuficiente");
     }
     setLoading(true);

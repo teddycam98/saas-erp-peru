@@ -72,11 +72,12 @@ export default function ClientesClient({ initialData }: { initialData: Cli[] }) 
                 <th className="px-4 py-3 text-left font-bold">Nombre / Razón Social</th>
                 <th className="px-4 py-3 text-left font-bold">Email</th>
                 <th className="px-4 py-3 text-left font-bold">Teléfono</th>
+                <th className="px-4 py-3 text-left font-bold hidden sm:table-cell">Dirección</th>
                 <th className="px-4 py-3 text-center font-bold">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/30">
-              {filtrados.length === 0 && <tr><td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">No se encontraron clientes</td></tr>}
+              {filtrados.length === 0 && <tr><td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">No se encontraron clientes</td></tr>}
               {filtrados.map(c => (
                 <tr key={c.id} className="hover:bg-secondary/20 transition-colors">
                   <td className="px-4 py-3"><span className="text-[10px] bg-secondary px-2 py-0.5 rounded font-bold">{c.tipoDocumento}</span></td>
@@ -89,6 +90,7 @@ export default function ClientesClient({ initialData }: { initialData: Cli[] }) 
                   </td>
                   <td className="px-4 py-3 text-xs text-muted-foreground">{c.email || "—"}</td>
                   <td className="px-4 py-3 text-xs text-muted-foreground">{c.telefono || "—"}</td>
+                  <td className="px-4 py-3 text-xs text-muted-foreground hidden sm:table-cell max-w-[150px] truncate" title={c.direccion}>{c.direccion || "—"}</td>
                   <td className="px-4 py-3 text-center">
                     <div className="flex justify-center gap-1">
                       <button onClick={() => openEdit(c)} className="p-1.5 bg-secondary rounded-lg hover:bg-secondary/80"><Pencil className="w-3.5 h-3.5" /></button>

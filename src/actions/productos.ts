@@ -43,8 +43,16 @@ const actualizarProductoSchema = z.object({
 const crearCategoriaSchema = z.object({
   nombre: z.string().min(1, "Nombre es obligatorio"),
 });
+const actualizarCategoriaSchema = z.object({
+  id: z.string().uuid(),
+  nombre: z.string().min(1, "Nombre es obligatorio"),
+});
 
 const crearMarcaSchema = z.object({
+  nombre: z.string().min(1, "Nombre es obligatorio"),
+});
+const actualizarMarcaSchema = z.object({
+  id: z.string().uuid(),
   nombre: z.string().min(1, "Nombre es obligatorio"),
 });
 
@@ -346,5 +354,39 @@ export async function crearMarca(input: z.infer<typeof crearMarcaSchema>) {
       empresaId,
       nombre: data.nombre,
     },
+  });
+}
+
+export async function actualizarCategoria(input: z.infer<typeof actualizarCategoriaSchema>) {
+  const { empresaId } = await getSessionData();
+  const data = actualizarCategoriaSchema.parse(input);
+  return prisma.categoria.update({
+    where: { id: data.id, empresaId },
+    data: { nombre: data.nombre },
+  });
+}
+
+export async function eliminarCategoria(id: string) {
+  const { empresaId } = await getSessionData();
+  return prisma.categoria.update({
+    where: { id, empresaId },
+    data: { deletedAt: new Date() },
+  });
+}
+
+export async function actualizarMarca(input: z.infer<typeof actualizarMarcaSchema>) {
+  const { empresaId } = await getSessionData();
+  const data = actualizarMarcaSchema.parse(input);
+  return prisma.marca.update({
+    where: { id: data.id, empresaId },
+    data: { nombre: data.nombre },
+  });
+}
+
+export async function eliminarMarca(id: string) {
+  const { empresaId } = await getSessionData();
+  return prisma.marca.update({
+    where: { id, empresaId },
+    data: { deletedAt: new Date() },
   });
 }

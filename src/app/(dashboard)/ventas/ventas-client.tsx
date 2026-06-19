@@ -12,7 +12,7 @@ interface VentaData {
   detalles: { nombre: string; cantidad: number; precioUnitario: number; total: number }[];
 }
 
-export default function VentasClient({ initialData }: { initialData: VentaData[] }) {
+export default function VentasClient({ initialData, empresa }: { initialData: VentaData[], empresa: any }) {
   const router = useRouter();
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -54,7 +54,14 @@ export default function VentasClient({ initialData }: { initialData: VentaData[]
       .items { margin: 6px 0; }
       .item { margin-bottom: 3px; }
       h2 { font-size: 14px; margin-bottom: 2px; }
+      .company-info { text-align: center; margin-bottom: 10px; }
     </style></head><body onload="window.print();window.close();">
+      <div class="company-info">
+        <h2 class="bold">${empresa.razonSocial || "Empresa"}</h2>
+        <div>RUC: ${empresa.ruc || "00000000000"}</div>
+        <div>${empresa.direccion || "Dirección no especificada"}</div>
+      </div>
+      <div class="line"></div>
       <div class="center"><h2>COMPROBANTE DE VENTA</h2></div>
       <div class="line"></div>
       <div class="row"><span>${v.tipoComprobante}</span><span class="bold">${v.serie}-${String(v.correlativo).padStart(8, "0")}</span></div>
@@ -96,7 +103,7 @@ export default function VentasClient({ initialData }: { initialData: VentaData[]
       .totals .total { font-size: 16px; font-weight: bold; border-top: 2px solid #7C3AED; padding-top: 8px; margin-top: 5px; color: #7C3AED; }
     </style></head><body onload="window.print();">
       <div class="header">
-        <div><div class="company">MI EMPRESA S.A.C.</div><div>RUC: 20000000001</div><div>Dirección fiscal</div></div>
+        <div><div class="company">${empresa.razonSocial || "Empresa"}</div><div>RUC: ${empresa.ruc || "00000000000"}</div><div>${empresa.direccion || "Dirección no especificada"}</div></div>
         <div class="doc-info"><div class="doc-type">${v.tipoComprobante}</div><div class="doc-num">${v.serie}-${String(v.correlativo).padStart(8, "0")}</div><div>Fecha: ${new Date(v.fechaEmision).toLocaleDateString()}</div></div>
       </div>
       <div class="client-info"><strong>Cliente:</strong> ${v.clienteNombre} ${v.clienteDoc ? `| Doc: ${v.clienteDoc}` : ""}</div>
