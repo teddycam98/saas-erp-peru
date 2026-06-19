@@ -33,8 +33,8 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/10 via-background to-background z-0" />
+    <div className="min-h-screen flex items-center justify-center bg-transparent p-4">
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/10 via-transparent to-transparent z-0" />
       
       <div className="w-full max-w-md relative z-10">
         <div className="glass border border-border/50 p-8 rounded-3xl shadow-2xl backdrop-blur-xl">

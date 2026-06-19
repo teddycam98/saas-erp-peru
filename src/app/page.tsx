@@ -3,7 +3,7 @@ import { ArrowRight, BarChart, ShieldCheck, Zap } from "lucide-react";
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-background text-foreground selection:bg-primary/30">
+    <div className="min-h-screen bg-transparent text-foreground selection:bg-primary/30">
       {/* Navbar */}
       <nav className="flex items-center justify-between px-6 py-4 lg:px-12 glass sticky top-0 z-50 border-b border-border/40">
         <div className="flex items-center gap-2">

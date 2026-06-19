@@ -17,7 +17,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" className="dark">
-      <body className={`${inter.className} min-h-screen bg-background antialiased`}>
+      <body className={`${inter.className} min-h-screen antialiased text-foreground`}>
+        <div className="google-ai-bg"></div>
         <SessionProvider>
           {children}
         </SessionProvider>

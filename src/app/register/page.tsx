@@ -33,7 +33,7 @@ export default function RegisterPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4 text-center">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-transparent p-4 text-center">
         <div className="w-20 h-20 rounded-full bg-emerald-500/20 flex items-center justify-center mb-6 animate-bounce">
           <CheckCircle2 className="w-10 h-10 text-emerald-500" />
         </div>
@@ -44,8 +44,8 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,_var(--tw-gradient-stops))] from-primary/10 via-background to-background z-0" />
+    <div className="min-h-screen flex items-center justify-center bg-transparent p-4">
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,_var(--tw-gradient-stops))] from-primary/10 via-transparent to-transparent z-0" />
       
       <div className="w-full max-w-xl relative z-10 my-8">
         <div className="glass border border-border/50 p-8 rounded-3xl shadow-2xl backdrop-blur-xl">
