@@ -3,16 +3,15 @@ import { getClientes } from "@/actions/clientes";
 
 export default async function ClientesPage() {
   const clientes = await getClientes();
-  
-  // Transformar datos para el cliente (serializar fechas/decimales si es necesario)
-  const data = clientes.map(c => ({
+
+  const data = clientes.map((c: any) => ({
     id: c.id,
     nombre: c.nombre,
-    documento: c.numeroDocumento || "",
     tipoDocumento: c.tipoDocumento || "DNI",
+    documento: c.numeroDocumento || "",
     email: c.email || "",
     telefono: c.telefono || "",
-    estado: "Activo" // O lógica personalizada
+    direccion: c.direccion || "",
   }));
 
   return <ClientesClient initialData={data} />;

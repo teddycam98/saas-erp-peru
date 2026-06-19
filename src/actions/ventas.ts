@@ -1,157 +1,427 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
+import { getSessionData } from "@/lib/auth-utils";
+import { z } from "zod";
+import { Prisma } from "@prisma/client";
 
-export async function registrarVenta(data: {
-  clienteId?: string;
-  tipoComprobante: "BOLETA" | "FACTURA";
-  documentoCliente?: string;
-  nombreCliente?: string;
-  detalles: { productoId: string; cantidad: number; precio: number }[];
-  metodoPago: string;
-}) {
-  const session = await auth();
-  if (!(session?.user as any)?.empresaId) throw new Error("No autenticado");
+// ---------------------------------------------------------------------------
+// Zod Schemas
+// ---------------------------------------------------------------------------
 
-  // Obtener sucursal del usuario
-  const usuario = await prisma.usuario.findUnique({ where: { id: session!.user!.id }});
-  let targetSucursalId = usuario?.sucursalId;
-  if (!targetSucursalId) {
-    const suc = await prisma.sucursal.findFirst({ where: { empresaId: (session?.user as any)?.empresaId }, orderBy: { createdAt: 'asc' } });
-    targetSucursalId = suc?.id;
+const ventaDetalleSchema = z.object({
+  productoId: z.string().uuid(),
+  cantidad: z.number().int().positive("Cantidad debe ser mayor a 0"),
+  precioUnitario: z.number().positive("Precio unitario debe ser mayor a 0"),
+});
+
+const registrarVentaSchema = z.object({
+  tipoComprobante: z.enum(["BOLETA", "FACTURA"]),
+  clienteId: z.string().uuid().optional().nullable(),
+  documentoCliente: z.string().optional().nullable(),
+  nombreCliente: z.string().optional().nullable(),
+  tipoDocumentoCliente: z.enum(["DNI", "RUC", "CE", "PASAPORTE"]).optional().nullable(),
+  detalles: z.array(ventaDetalleSchema).min(1, "Debe incluir al menos un detalle"),
+  metodoPago: z.enum(["EFECTIVO", "TARJETA", "YAPE", "PLIN", "TRANSFERENCIA"]),
+  descuento: z.number().min(0).optional().default(0),
+  observaciones: z.string().optional().nullable(),
+});
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function serializeVenta<T extends Record<string, unknown>>(venta: T): T {
+  const result = { ...venta };
+  const decimalFields = ["subtotal", "igv", "descuento", "total"] as const;
+  for (const field of decimalFields) {
+    if (field in result && result[field] != null) {
+      (result as Record<string, unknown>)[field] = Number(result[field]);
+    }
   }
-  if (!targetSucursalId) throw new Error("No hay sucursales disponibles en la empresa");
+  return result;
+}
 
-  const subtotal = data.detalles.reduce((acc, d) => acc + (d.cantidad * d.precio), 0);
-  const igv = subtotal * 0.18;
-  const total = subtotal + igv;
+// ---------------------------------------------------------------------------
+// Queries
+// ---------------------------------------------------------------------------
 
-  // Transacción: Crear Venta + Detalles + Descontar Stock (Kardex)
-  const venta = await prisma.$transaction(async (tx) => {
-    
-    // 0. Crear cliente si no existe
-    let finalClienteId = data.clienteId;
-    if (!finalClienteId && data.documentoCliente && data.nombreCliente) {
-      const nuevoCliente = await tx.cliente.create({
-        data: {
-          empresaId: (session?.user as any)?.empresaId as string,
-          tipoDocumento: data.tipoComprobante === "FACTURA" ? "RUC" : "DNI",
+export async function getVentas(options?: {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  desde?: string;
+  hasta?: string;
+}) {
+  const { empresaId } = await getSessionData();
+
+  const page = options?.page ?? 1;
+  const pageSize = options?.pageSize ?? 50;
+  const skip = (page - 1) * pageSize;
+
+  const where: Prisma.VentaWhereInput = {
+    empresaId,
+    deletedAt: null,
+  };
+
+  if (options?.search) {
+    const term = options.search.trim();
+    where.OR = [
+      { serie: { contains: term, mode: "insensitive" } },
+      { cliente: { nombre: { contains: term, mode: "insensitive" } } },
+      { cliente: { numeroDocumento: { contains: term, mode: "insensitive" } } },
+    ];
+  }
+
+  if (options?.desde || options?.hasta) {
+    where.fechaEmision = {};
+    if (options?.desde) {
+      (where.fechaEmision as Prisma.DateTimeFilter).gte = new Date(options.desde);
+    }
+    if (options?.hasta) {
+      (where.fechaEmision as Prisma.DateTimeFilter).lte = new Date(
+        options.hasta + "T23:59:59.999Z"
+      );
+    }
+  }
+
+  const [ventas, total] = await Promise.all([
+    prisma.venta.findMany({
+      where,
+      include: {
+        cliente: {
+          select: {
+            id: true,
+            nombre: true,
+            tipoDocumento: true,
+            numeroDocumento: true,
+          },
+        },
+        usuario: {
+          select: { id: true, nombre: true },
+        },
+        detalles: {
+          include: {
+            producto: {
+              select: { id: true, nombre: true, codigo: true },
+            },
+          },
+        },
+      },
+      orderBy: { fechaEmision: "desc" },
+      skip,
+      take: pageSize,
+    }),
+    prisma.venta.count({ where }),
+  ]);
+
+  const serialized = ventas.map((v) => ({
+    ...v,
+    subtotal: Number(v.subtotal),
+    igv: Number(v.igv),
+    descuento: Number(v.descuento),
+    total: Number(v.total),
+    detalles: v.detalles.map((d) => ({
+      ...d,
+      precioUnitario: Number(d.precioUnitario),
+      total: Number(d.total),
+    })),
+  }));
+
+  return { ventas: serialized, total, page, pageSize };
+}
+
+// ---------------------------------------------------------------------------
+// Registrar Venta
+// ---------------------------------------------------------------------------
+
+export async function registrarVenta(
+  input: z.infer<typeof registrarVentaSchema>
+) {
+  const { empresaId, sucursalId, userId } = await getSessionData();
+  const data = registrarVentaSchema.parse(input);
+
+  const result = await prisma.$transaction(async (tx) => {
+    // 1. Resolve or create client -------------------------------------------------
+    let clienteId = data.clienteId ?? null;
+
+    if (
+      !clienteId &&
+      data.documentoCliente &&
+      data.nombreCliente &&
+      data.tipoDocumentoCliente
+    ) {
+      // Try to find existing client by document
+      const existingClient = await tx.cliente.findFirst({
+        where: {
+          empresaId,
+          tipoDocumento: data.tipoDocumentoCliente,
           numeroDocumento: data.documentoCliente,
-          nombre: data.nombreCliente,
-        }
+          deletedAt: null,
+        },
       });
-      finalClienteId = nuevoCliente.id;
+
+      if (existingClient) {
+        clienteId = existingClient.id;
+      } else {
+        const newClient = await tx.cliente.create({
+          data: {
+            empresaId,
+            nombre: data.nombreCliente,
+            tipoDocumento: data.tipoDocumentoCliente,
+            numeroDocumento: data.documentoCliente,
+          },
+        });
+        clienteId = newClient.id;
+      }
     }
 
-    // 1. Crear cabecera
-    const nuevaVenta = await tx.venta.create({
-      data: {
-        empresaId: (session?.user as any)?.empresaId as string,
-        sucursalId: targetSucursalId,
-        usuarioId: session!.user!.id as string,
-        clienteId: finalClienteId,
+    // 2. Get next correlativo from SerieSunat -----------------------------------
+    const seriePrefix = data.tipoComprobante === "BOLETA" ? "B001" : "F001";
+
+    let serieSunat = await tx.serieSunat.findFirst({
+      where: {
+        sucursalId,
         tipoComprobante: data.tipoComprobante,
-        serie: data.tipoComprobante === "FACTURA" ? "F001" : "B001",
-        correlativo: Math.floor(Math.random() * 100000), // Simulado hasta integrar correlativos reales
-        subtotal,
-        igv,
-        total,
-        metodoPago: data.metodoPago,
-      }
+        serie: seriePrefix,
+      },
     });
 
-    // 2. Crear detalles y actualizar Kardex
-    for (const det of data.detalles) {
-      await tx.ventaDetalle.create({
+    if (!serieSunat) {
+      serieSunat = await tx.serieSunat.create({
         data: {
-          ventaId: nuevaVenta.id,
-          productoId: det.productoId,
-          cantidad: det.cantidad,
-          precioUnitario: det.precio,
-          
-          
-          total: (det.cantidad * det.precio) * 1.18,
-        }
+          sucursalId,
+          tipoComprobante: data.tipoComprobante,
+          serie: seriePrefix,
+          correlativo: 1,
+        },
+      });
+    }
+
+    const correlativo = serieSunat.correlativo;
+
+    // Increment the correlativo for the next sale
+    await tx.serieSunat.update({
+      where: { id: serieSunat.id },
+      data: { correlativo: { increment: 1 } },
+    });
+
+    // 3. Calculate line totals and validate stock --------------------------------
+    const detallesConTotales: Array<{
+      productoId: string;
+      cantidad: number;
+      precioUnitario: Prisma.Decimal;
+      total: Prisma.Decimal;
+    }> = [];
+
+    let subtotalCalc = new Prisma.Decimal(0);
+
+    for (const detalle of data.detalles) {
+      // Validate the product belongs to this empresa
+      const producto = await tx.producto.findFirst({
+        where: {
+          id: detalle.productoId,
+          empresaId,
+          deletedAt: null,
+        },
       });
 
-      // 3. Descontar Stock Global
-      // 4. Actualizar Inventario Sucursal
+      if (!producto) {
+        throw new Error(`Producto ${detalle.productoId} no encontrado`);
+      }
 
-      // 4. Actualizar Inventario Sucursal
-      await tx.inventarioSucursal.upsert({
+      // Check stock
+      const inventario = await tx.inventarioSucursal.findUnique({
         where: {
           sucursalId_productoId: {
-            sucursalId: targetSucursalId,
-            productoId: det.productoId
-          }
+            sucursalId,
+            productoId: detalle.productoId,
+          },
         },
-        update: { stockActual: { decrement: det.cantidad } },
-        create: {
-          sucursalId: targetSucursalId,
-          productoId: det.productoId,
-          stockActual: -det.cantidad // Queda negativo si venden sin stock previo registrado en esa sucursal
-        }
+      });
+
+      if (!inventario || inventario.stockActual < detalle.cantidad) {
+        throw new Error(
+          `Stock insuficiente para "${producto.nombre}". Disponible: ${inventario?.stockActual ?? 0}, Solicitado: ${detalle.cantidad}`
+        );
+      }
+
+      const lineTotal = new Prisma.Decimal(detalle.precioUnitario).mul(
+        detalle.cantidad
+      );
+      subtotalCalc = subtotalCalc.add(lineTotal);
+
+      detallesConTotales.push({
+        productoId: detalle.productoId,
+        cantidad: detalle.cantidad,
+        precioUnitario: new Prisma.Decimal(detalle.precioUnitario),
+        total: lineTotal,
       });
     }
 
-    return nuevaVenta;
-  });
+    // 4. Calculate IGV (18% Peru) ------------------------------------------------
+    const descuentoDecimal = new Prisma.Decimal(data.descuento);
+    const baseImponible = subtotalCalc.sub(descuentoDecimal);
+    // subtotal = baseImponible / 1.18 (IGV is included in the price in Peru retail)
+    const subtotalSinIGV = baseImponible.div(new Prisma.Decimal("1.18"));
+    const igv = baseImponible.sub(subtotalSinIGV);
+    const total = baseImponible;
 
-  return { success: true, venta };
-}
-
-export async function getVentas() {
-  const session = await auth();
-  if (!(session?.user as any)?.empresaId) throw new Error("No autenticado");
-
-  return prisma.venta.findMany({
-    where: { empresaId: (session?.user as any)?.empresaId },
-    include: {
-      cliente: true,
-      usuario: true,
-      detalles: {
-        include: { producto: true }
-      }
-    },
-    orderBy: { fechaEmision: 'desc' }
-  });
-}
-
-export async function anularVenta(id: string) {
-  const session = await auth();
-  if (!(session?.user as any)?.empresaId) throw new Error("No autenticado");
-
-  const venta = await prisma.venta.findUnique({
-    where: { id },
-    include: { detalles: true }
-  });
-
-  if (!venta) throw new Error("Venta no encontrada");
-  if (venta.empresaId !== (session?.user as any)?.empresaId) throw new Error("Acceso denegado");
-
-  // Revertir el stock en una transacción
-  await prisma.$transaction(async (tx) => {
-    // Restaurar stock
-    for (const det of venta.detalles) {
-      const inv = await tx.inventarioSucursal.findFirst({
-        where: { sucursalId: venta.sucursalId, productoId: det.productoId }
-      });
-      if (inv) {
-        await tx.inventarioSucursal.update({
-          where: { id: inv.id },
-          data: { stockActual: { increment: det.cantidad } }
-        });
-      }
-    }
-
-    // Opcional: Podrías eliminar la venta o cambiarle el estado a "ANULADO". 
-    // Como no hay estado "Anulado" en el schema actual, podemos eliminarla directamente para simplificar.
-    // O si quieres mantener el registro, agregar un campo estado. Por ahora la eliminamos para no complicar el schema.
-    await tx.venta.delete({
-      where: { id }
+    // 5. Create Venta ------------------------------------------------------------
+    const venta = await tx.venta.create({
+      data: {
+        empresaId,
+        sucursalId,
+        usuarioId: userId,
+        clienteId,
+        tipoComprobante: data.tipoComprobante,
+        serie: seriePrefix,
+        correlativo,
+        subtotal: subtotalSinIGV.toDecimalPlaces(2),
+        igv: igv.toDecimalPlaces(2),
+        descuento: descuentoDecimal,
+        total: total.toDecimalPlaces(2),
+        metodoPago: data.metodoPago,
+        estadoSunat: "BORRADOR",
+        detalles: {
+          create: detallesConTotales.map((d) => ({
+            productoId: d.productoId,
+            cantidad: d.cantidad,
+            precioUnitario: d.precioUnitario,
+            total: d.total,
+          })),
+        },
+      },
+      include: {
+        detalles: {
+          include: {
+            producto: { select: { id: true, nombre: true, codigo: true } },
+          },
+        },
+        cliente: {
+          select: {
+            id: true,
+            nombre: true,
+            tipoDocumento: true,
+            numeroDocumento: true,
+          },
+        },
+      },
     });
+
+    // 6. Decrement stock and create Kardex entries --------------------------------
+    for (const detalle of detallesConTotales) {
+      const updated = await tx.inventarioSucursal.update({
+        where: {
+          sucursalId_productoId: {
+            sucursalId,
+            productoId: detalle.productoId,
+          },
+        },
+        data: {
+          stockActual: { decrement: detalle.cantidad },
+        },
+      });
+
+      await tx.kardex.create({
+        data: {
+          empresaId,
+          sucursalId,
+          productoId: detalle.productoId,
+          tipoMovimiento: "EGRESO",
+          origen: "VENTA",
+          cantidad: detalle.cantidad,
+          stockSaldo: updated.stockActual,
+          costoUnitario: detalle.precioUnitario,
+          referenciaId: venta.id,
+          detalle: `Venta ${seriePrefix}-${correlativo}`,
+        },
+      });
+    }
+
+    return venta;
   });
 
-  return { success: true };
+  return {
+    ...result,
+    subtotal: Number(result.subtotal),
+    igv: Number(result.igv),
+    descuento: Number(result.descuento),
+    total: Number(result.total),
+    detalles: result.detalles.map((d) => ({
+      ...d,
+      precioUnitario: Number(d.precioUnitario),
+      total: Number(d.total),
+    })),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Anular Venta
+// ---------------------------------------------------------------------------
+
+export async function anularVenta(ventaId: string) {
+  const { empresaId, sucursalId, userId } = await getSessionData();
+
+  const result = await prisma.$transaction(async (tx) => {
+    // Validate ownership
+    const venta = await tx.venta.findFirst({
+      where: { id: ventaId, empresaId, deletedAt: null },
+      include: { detalles: true },
+    });
+
+    if (!venta) {
+      throw new Error("Venta no encontrada");
+    }
+
+    if (venta.estadoSunat === "ANULADO") {
+      throw new Error("Esta venta ya fue anulada");
+    }
+
+    // Restore stock for each detail
+    for (const detalle of venta.detalles) {
+      const updated = await tx.inventarioSucursal.update({
+        where: {
+          sucursalId_productoId: {
+            sucursalId: venta.sucursalId,
+            productoId: detalle.productoId,
+          },
+        },
+        data: {
+          stockActual: { increment: detalle.cantidad },
+        },
+      });
+
+      await tx.kardex.create({
+        data: {
+          empresaId,
+          sucursalId: venta.sucursalId,
+          productoId: detalle.productoId,
+          tipoMovimiento: "INGRESO",
+          origen: "VENTA",
+          cantidad: detalle.cantidad,
+          stockSaldo: updated.stockActual,
+          costoUnitario: detalle.precioUnitario,
+          referenciaId: venta.id,
+          detalle: `Anulación venta ${venta.serie}-${venta.correlativo}`,
+        },
+      });
+    }
+
+    // Mark venta as anulada
+    const ventaAnulada = await tx.venta.update({
+      where: { id: ventaId },
+      data: { estadoSunat: "ANULADO" },
+    });
+
+    return ventaAnulada;
+  });
+
+  return {
+    ...result,
+    subtotal: Number(result.subtotal),
+    igv: Number(result.igv),
+    descuento: Number(result.descuento),
+    total: Number(result.total),
+  };
 }

@@ -1,158 +1,125 @@
 "use client";
-import { Users, Plus, Search, Mail, Phone, MapPin, X, Pencil, Trash2, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { Users, Plus, Search, X, Pencil, Trash2, Loader2 } from "lucide-react";
+import { useState, useMemo } from "react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { crearCliente, actualizarCliente, eliminarCliente } from "@/actions/clientes";
 
-export default function ClientesClient({ initialData }: { initialData: any[] }) {
+interface Cli { id: string; nombre: string; tipoDocumento: string; documento: string; email: string; telefono: string; direccion: string; }
+
+const emptyForm = { id: "", tipo: "DNI", doc: "", nombre: "", email: "", telefono: "", direccion: "" };
+
+export default function ClientesClient({ initialData }: { initialData: Cli[] }) {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [nuevoCli, setNuevoCli] = useState<any>({ id: null, tipo: "DNI", doc: "", nombre: "", email: "", telf: "" });
+  const [form, setForm] = useState(emptyForm);
 
-  const filtrados = initialData.filter(c => 
-    c.nombre.toLowerCase().includes(search.toLowerCase()) || 
-    c.documento?.includes(search)
-  );
+  const filtrados = useMemo(() => {
+    if (!search) return initialData;
+    const s = search.toLowerCase();
+    return initialData.filter(c => c.nombre.toLowerCase().includes(s) || c.documento.includes(s) || c.email.toLowerCase().includes(s));
+  }, [initialData, search]);
 
-  const handleCrear = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      if (nuevoCli.id) {
-        await actualizarCliente(nuevoCli.id, {
-          nombre: nuevoCli.nombre,
-          numeroDocumento: nuevoCli.doc,
-          tipoDocumento: nuevoCli.tipo,
-          email: nuevoCli.email,
-          telefono: nuevoCli.telf,
-        });
-        toast.success("Datos del cliente actualizados");
-      } else {
-        await crearCliente({
-          nombre: nuevoCli.nombre,
-          numeroDocumento: nuevoCli.doc,
-          tipoDocumento: nuevoCli.tipo,
-          email: nuevoCli.email,
-          telefono: nuevoCli.telf,
-        });
-        toast.success("Cliente guardado en el CRM");
-      }
+      const payload = { nombre: form.nombre, tipoDocumento: form.tipo, numeroDocumento: form.doc, email: form.email || undefined, telefono: form.telefono || undefined, direccion: form.direccion || undefined };
+      if (form.id) { await actualizarCliente({ id: form.id, ...payload as any }); toast.success("Cliente actualizado"); }
+      else { await crearCliente(payload as any); toast.success("Cliente creado"); }
       setShowModal(false);
-      setNuevoCli({ id: null, tipo: "DNI", doc: "", nombre: "", email: "", telf: "" });
+      setForm(emptyForm);
       router.refresh();
-    } catch (error: any) {
-      toast.error(error.message || "Error al guardar el cliente");
-    } finally {
-      setLoading(false);
-    }
+    } catch (err: any) { toast.error(err.message); } finally { setLoading(false); }
   };
 
-  const openEdit = (c: any) => {
-    setNuevoCli({ id: c.id, tipo: c.tipoDocumento || "DNI", doc: c.documento || "", nombre: c.nombre, email: c.email || "", telf: c.telefono || "" });
+  const openEdit = (c: Cli) => {
+    setForm({ id: c.id, tipo: c.tipoDocumento, doc: c.documento, nombre: c.nombre, email: c.email, telefono: c.telefono, direccion: c.direccion });
     setShowModal(true);
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("¿Estás seguro de eliminar este cliente?")) return;
-    try {
-      await eliminarCliente(id);
-      toast.success("Cliente eliminado");
-      router.refresh();
-    } catch (error: any) {
-      toast.error("Error al eliminar: " + error.message);
-    }
+    if (!confirm("¿Eliminar este cliente?")) return;
+    try { await eliminarCliente(id); toast.success("Eliminado"); router.refresh(); } catch (err: any) { toast.error(err.message); }
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+    <div className="space-y-5 animate-fade-in">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
-          <h1 className="text-3xl font-heading font-bold text-foreground">Directorio de Clientes</h1>
-          <p className="text-muted-foreground mt-1 text-sm">Gestiona la base de datos de tus compradores B2B/B2C.</p>
+          <h1 className="text-2xl font-bold">Directorio de Clientes</h1>
+          <p className="text-sm text-muted-foreground">Gestiona tu base de datos de clientes B2B/B2C</p>
         </div>
-        <button onClick={() => { setNuevoCli({ id: null, tipo: "DNI", doc: "", nombre: "", email: "", telf: "" }); setShowModal(true); }} className="bg-primary text-primary-foreground px-4 py-2 rounded-lg font-medium hover:bg-primary/90 flex items-center shadow-[0_0_15px_rgba(var(--primary),0.3)]">
-          <Plus className="w-4 h-4 mr-2" /> Nuevo Cliente
+        <button onClick={() => { setForm(emptyForm); setShowModal(true); }} className="bg-primary text-white px-4 py-2 rounded-xl font-medium text-sm hover:bg-primary/90 shadow-[0_0_15px_rgba(124,58,237,0.3)] flex items-center gap-2">
+          <Plus className="w-4 h-4" /> Nuevo Cliente
         </button>
       </div>
 
-      <div className="glass-panel p-4 rounded-2xl">
-        <div className="relative mb-6">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-          <input 
-            type="text" 
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por DNI/RUC o Nombre..." 
-            className="w-full bg-background/50 border border-border/50 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary text-foreground"
-          />
-        </div>
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por DNI/RUC, nombre o email..." className="w-full bg-card border border-border/50 rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+      </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtrados.map(c => (
-            <div key={c.id} className="bg-secondary/30 border border-border/50 rounded-xl p-5 hover:border-primary/50 transition-all group relative">
-              <div className="absolute top-4 right-4 flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button onClick={() => openEdit(c)} className="text-muted-foreground hover:text-primary bg-background p-2 rounded-lg">
-                  <Pencil className="w-4 h-4" />
-                </button>
-                <button onClick={() => handleDelete(c.id)} className="text-muted-foreground hover:text-destructive bg-background p-2 rounded-lg">
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-              <div className="flex items-start justify-between mb-3">
-                <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center text-primary font-bold">
-                  {c.nombre.charAt(0).toUpperCase()}
-                </div>
-                <span className="text-xs font-mono bg-background px-2 py-1 rounded-md border border-border/50">
-                  {c.documento}
-                </span>
-              </div>
-              <h3 className="font-bold text-lg text-foreground truncate pr-16">{c.nombre}</h3>
-              <div className="mt-4 space-y-2">
-                <p className="text-sm text-muted-foreground flex items-center"><Mail className="w-4 h-4 mr-2" /> {c.email || "Sin correo"}</p>
-                <p className="text-sm text-muted-foreground flex items-center"><Phone className="w-4 h-4 mr-2" /> {c.telefono || "Sin teléfono"}</p>
-              </div>
-            </div>
-          ))}
+      <div className="glass-panel rounded-2xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-secondary/30 text-muted-foreground text-xs uppercase">
+              <tr>
+                <th className="px-4 py-3 text-left font-bold">Tipo</th>
+                <th className="px-4 py-3 text-left font-bold">Documento</th>
+                <th className="px-4 py-3 text-left font-bold">Nombre / Razón Social</th>
+                <th className="px-4 py-3 text-left font-bold">Email</th>
+                <th className="px-4 py-3 text-left font-bold">Teléfono</th>
+                <th className="px-4 py-3 text-center font-bold">Acciones</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/30">
+              {filtrados.length === 0 && <tr><td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">No se encontraron clientes</td></tr>}
+              {filtrados.map(c => (
+                <tr key={c.id} className="hover:bg-secondary/20 transition-colors">
+                  <td className="px-4 py-3"><span className="text-[10px] bg-secondary px-2 py-0.5 rounded font-bold">{c.tipoDocumento}</span></td>
+                  <td className="px-4 py-3 font-mono text-xs">{c.documento}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center shrink-0">{c.nombre.charAt(0).toUpperCase()}</div>
+                      <span className="text-xs font-medium">{c.nombre}</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-xs text-muted-foreground">{c.email || "—"}</td>
+                  <td className="px-4 py-3 text-xs text-muted-foreground">{c.telefono || "—"}</td>
+                  <td className="px-4 py-3 text-center">
+                    <div className="flex justify-center gap-1">
+                      <button onClick={() => openEdit(c)} className="p-1.5 bg-secondary rounded-lg hover:bg-secondary/80"><Pencil className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => handleDelete(c.id)} className="p-1.5 bg-red-500/10 text-red-400 rounded-lg hover:bg-red-500/20"><Trash2 className="w-3.5 h-3.5" /></button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
 
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-card w-full max-w-md rounded-2xl border border-border/50 shadow-2xl p-6 relative">
-            <button onClick={() => setShowModal(false)} className="absolute top-4 right-4 text-muted-foreground hover:text-foreground">
-              <X className="w-5 h-5" />
-            </button>
-            <h2 className="text-xl font-heading font-bold mb-4">{nuevoCli.id ? "Editar Cliente" : "Agregar Cliente"}</h2>
-            <form onSubmit={handleCrear} className="space-y-4">
+            <button onClick={() => setShowModal(false)} className="absolute top-4 right-4 text-muted-foreground hover:text-foreground"><X className="w-5 h-5" /></button>
+            <h2 className="text-lg font-bold mb-4">{form.id ? "Editar Cliente" : "Nuevo Cliente"}</h2>
+            <form onSubmit={handleSubmit} className="space-y-3">
               <div className="grid grid-cols-3 gap-3">
-                <div className="col-span-1">
-                  <label className="text-xs font-medium mb-1 block">Doc</label>
-                  <select value={nuevoCli.tipo} onChange={e => setNuevoCli({...nuevoCli, tipo: e.target.value})} className="w-full bg-background border border-border/50 rounded-lg px-2 py-2 text-sm">
-                    <option>DNI</option><option>RUC</option>
-                  </select>
-                </div>
-                <div className="col-span-2">
-                  <label className="text-xs font-medium mb-1 block">Número</label>
-                  <input required value={nuevoCli.doc} onChange={e => setNuevoCli({...nuevoCli, doc: e.target.value})} type="text" className="w-full bg-background border border-border/50 rounded-lg px-3 py-2 text-sm" />
-                </div>
+                <div><label className="text-xs font-medium mb-1 block">Tipo Doc</label><select value={form.tipo} onChange={e => setForm({...form, tipo: e.target.value})} className="w-full bg-background border border-border/50 rounded-lg px-2 py-2 text-sm"><option>DNI</option><option>RUC</option><option>CE</option><option>PASAPORTE</option></select></div>
+                <div className="col-span-2"><label className="text-xs font-medium mb-1 block">Número *</label><input required value={form.doc} onChange={e => setForm({...form, doc: e.target.value})} className="w-full bg-background border border-border/50 rounded-lg px-3 py-2 text-sm" /></div>
               </div>
-              <div>
-                <label className="text-xs font-medium mb-1 block">Razón Social / Nombres</label>
-                <input required value={nuevoCli.nombre} onChange={e => setNuevoCli({...nuevoCli, nombre: e.target.value})} type="text" className="w-full bg-background border border-border/50 rounded-lg px-3 py-2 text-sm" />
+              <div><label className="text-xs font-medium mb-1 block">Nombre / Razón Social *</label><input required value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})} className="w-full bg-background border border-border/50 rounded-lg px-3 py-2 text-sm" /></div>
+              <div><label className="text-xs font-medium mb-1 block">Email</label><input type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} className="w-full bg-background border border-border/50 rounded-lg px-3 py-2 text-sm" /></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="text-xs font-medium mb-1 block">Teléfono</label><input value={form.telefono} onChange={e => setForm({...form, telefono: e.target.value})} className="w-full bg-background border border-border/50 rounded-lg px-3 py-2 text-sm" /></div>
+                <div><label className="text-xs font-medium mb-1 block">Dirección</label><input value={form.direccion} onChange={e => setForm({...form, direccion: e.target.value})} className="w-full bg-background border border-border/50 rounded-lg px-3 py-2 text-sm" /></div>
               </div>
-              <div>
-                <label className="text-xs font-medium mb-1 block">Correo</label>
-                <input value={nuevoCli.email} onChange={e => setNuevoCli({...nuevoCli, email: e.target.value})} type="email" className="w-full bg-background border border-border/50 rounded-lg px-3 py-2 text-sm" />
-              </div>
-              <div>
-                <label className="text-xs font-medium mb-1 block">Teléfono</label>
-                <input value={nuevoCli.telf} onChange={e => setNuevoCli({...nuevoCli, telf: e.target.value})} type="text" className="w-full bg-background border border-border/50 rounded-lg px-3 py-2 text-sm" />
-              </div>
-              <button type="submit" disabled={loading} className="w-full bg-primary text-primary-foreground py-2.5 rounded-xl font-bold mt-2 flex justify-center items-center disabled:opacity-50">
-                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (nuevoCli.id ? "Guardar Cambios" : "Guardar Cliente")}
+              <button type="submit" disabled={loading} className="w-full bg-primary text-white py-2.5 rounded-xl font-bold text-sm mt-2 flex items-center justify-center gap-2 disabled:opacity-50 hover:bg-primary/90 shadow-[0_0_15px_rgba(124,58,237,0.3)]">
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (form.id ? "Guardar Cambios" : "Crear Cliente")}
               </button>
             </form>
           </div>

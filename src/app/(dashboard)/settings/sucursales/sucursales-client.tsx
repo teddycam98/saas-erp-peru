@@ -16,7 +16,8 @@ export default function SucursalesClient({ initialData }: { initialData: any[] }
     setLoading(true);
     try {
       if (nuevaSuc.id) {
-        await actualizarSucursal(nuevaSuc.id, {
+        await actualizarSucursal({
+          id: nuevaSuc.id,
           nombre: nuevaSuc.nombre,
           direccion: nuevaSuc.direccion,
           telefono: nuevaSuc.telefono,

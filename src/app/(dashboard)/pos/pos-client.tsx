@@ -1,277 +1,280 @@
 "use client";
-import { Search, ScanBarcode, User, Printer, CreditCard, Banknote, Trash2, Plus, Minus, ShoppingCart, Loader2 } from "lucide-react";
-import { motion } from "framer-motion";
+import { Search, Plus, Minus, Trash2, ShoppingCart, Loader2, Receipt, Banknote, CreditCard, Smartphone, ArrowRightLeft } from "lucide-react";
+import { useState, useMemo } from "react";
 import { toast } from "sonner";
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { registrarVenta } from "@/actions/ventas";
 
-export default function POSClient({ productos, clientes }: { productos: any[], clientes: any[] }) {
-  const router = useRouter();
-  const [carrito, setCarrito] = useState<{id: string, nombre: string, cant: number, precio: number, stock: number}[]>([]);
-  const [search, setSearch] = useState("");
-  
-  const [tipoComprobante, setTipoComprobante] = useState<"BOLETA" | "FACTURA">("BOLETA");
-  const [clienteId, setClienteId] = useState<string | null>(null);
-  
-  // Para nuevo cliente rápido
-  const [documentoCliente, setDocumentoCliente] = useState("");
-  const [nombreCliente, setNombreCliente] = useState("");
+interface Producto { id: string; nombre: string; codigo: string; precio: number; costo: number; categoriaId: string; categoriaNombre: string; img: string; stock: number; }
+interface Cliente { id: string; nombre: string; documento: string; tipoDocumento: string; }
+interface Categoria { id: string; nombre: string; }
+interface CartItem { id: string; nombre: string; cant: number; precio: number; stock: number; }
 
+const METODOS_PAGO = [
+  { id: "EFECTIVO", label: "Efectivo", icon: Banknote, color: "emerald" },
+  { id: "TARJETA", label: "Tarjeta", icon: CreditCard, color: "blue" },
+  { id: "YAPE", label: "Yape", icon: Smartphone, color: "purple" },
+  { id: "PLIN", label: "Plin", icon: Smartphone, color: "cyan" },
+  { id: "TRANSFERENCIA", label: "Transfer.", icon: ArrowRightLeft, color: "orange" },
+];
+
+export default function POSClient({ productos, clientes, categorias }: { productos: Producto[]; clientes: Cliente[]; categorias: Categoria[] }) {
+  const router = useRouter();
+  const [carrito, setCarrito] = useState<CartItem[]>([]);
+  const [search, setSearch] = useState("");
+  const [catFilter, setCatFilter] = useState<string | null>(null);
+  const [tipoComprobante, setTipoComprobante] = useState<"BOLETA" | "FACTURA">("BOLETA");
+  const [clienteId, setClienteId] = useState<string>("");
+  const [docCliente, setDocCliente] = useState("");
+  const [nombreCliente, setNombreCliente] = useState("");
+  const [metodoPago, setMetodoPago] = useState("EFECTIVO");
+  const [montoRecibido, setMontoRecibido] = useState("");
+  const [descuento, setDescuento] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const filtrados = productos.filter(p => p.nombre.toLowerCase().includes(search.toLowerCase()));
+  const filtrados = useMemo(() => {
+    return productos.filter(p => {
+      const matchSearch = !search || p.nombre.toLowerCase().includes(search.toLowerCase()) || p.codigo.toLowerCase().includes(search.toLowerCase());
+      const matchCat = !catFilter || p.categoriaId === catFilter;
+      return matchSearch && matchCat;
+    });
+  }, [productos, search, catFilter]);
 
-  const addToCart = (prod: any) => {
-    if (prod.stock <= 0) {
-      toast.error("Producto agotado");
-      return;
-    }
+  const addToCart = (prod: Producto) => {
+    if (prod.stock <= 0) return toast.error("Sin stock");
     setCarrito(prev => {
-      const exists = prev.find(item => item.id === prod.id);
+      const exists = prev.find(i => i.id === prod.id);
       if (exists) {
-        if (exists.cant >= prod.stock) {
-          toast.error("Stock insuficiente");
-          return prev;
-        }
-        return prev.map(item => item.id === prod.id ? { ...item, cant: item.cant + 1 } : item);
+        if (exists.cant >= prod.stock) { toast.error("Stock insuficiente"); return prev; }
+        return prev.map(i => i.id === prod.id ? { ...i, cant: i.cant + 1 } : i);
       }
       return [...prev, { id: prod.id, nombre: prod.nombre, cant: 1, precio: prod.precio, stock: prod.stock }];
     });
   };
 
-  const updateCant = (id: string, delta: number) => {
-    setCarrito(prev => {
-      const updated = prev.map(item => {
-        if (item.id === id) {
-          const newCant = item.cant + delta;
-          if (newCant > item.stock) {
-            toast.error("Stock insuficiente");
-            return item;
-          }
-          return { ...item, cant: newCant > 0 ? newCant : 0 };
-        }
-        return item;
-      }).filter(item => item.cant > 0);
-      return updated;
-    });
+  const updateQty = (id: string, delta: number) => {
+    setCarrito(prev => prev.map(i => {
+      if (i.id !== id) return i;
+      const n = i.cant + delta;
+      if (n > i.stock) { toast.error("Stock insuficiente"); return i; }
+      return { ...i, cant: Math.max(0, n) };
+    }).filter(i => i.cant > 0));
   };
 
-  const subtotal = carrito.reduce((acc, item) => acc + (item.cant * item.precio), 0);
-  const igv = subtotal * 0.18;
-  const total = subtotal + igv;
+  const removeItem = (id: string) => setCarrito(prev => prev.filter(i => i.id !== id));
 
-  const emitirComprobante = async (metodoPago: string) => {
+  const subtotal = carrito.reduce((a, i) => a + i.cant * i.precio, 0);
+  const descuentoVal = parseFloat(descuento) || 0;
+  const baseGravada = subtotal - descuentoVal;
+  const igv = baseGravada * 0.18;
+  const total = baseGravada + igv;
+  const montoRec = parseFloat(montoRecibido) || 0;
+  const vuelto = metodoPago === "EFECTIVO" ? Math.max(0, montoRec - total) : 0;
+
+  const emitir = async () => {
     if (carrito.length === 0) return toast.error("El carrito está vacío");
-    
-    if (tipoComprobante === "FACTURA") {
-      if (!clienteId && (!documentoCliente || !nombreCliente)) {
-        return toast.error("Para emitir FACTURA debe seleccionar o ingresar el RUC y Razón Social del cliente.");
-      }
+    if (tipoComprobante === "FACTURA" && !clienteId && (!docCliente || !nombreCliente)) {
+      return toast.error("Para FACTURA ingrese RUC y Razón Social");
     }
-
+    if (metodoPago === "EFECTIVO" && montoRec < total) {
+      return toast.error("El monto recibido es insuficiente");
+    }
     setLoading(true);
-    const tId = toast.loading("Registrando venta...");
     try {
       await registrarVenta({
-        clienteId: clienteId || undefined,
         tipoComprobante,
-        documentoCliente: clienteId ? undefined : documentoCliente,
-        nombreCliente: clienteId ? undefined : nombreCliente,
-        metodoPago,
-        detalles: carrito.map(c => ({
-          productoId: c.id,
-          cantidad: c.cant,
-          precio: c.precio
-        }))
+        clienteId: clienteId || undefined,
+        documentoCliente: !clienteId ? docCliente : undefined,
+        nombreCliente: !clienteId ? nombreCliente : undefined,
+        metodoPago: metodoPago as any,
+        descuento: descuentoVal,
+        detalles: carrito.map(c => ({ productoId: c.id, cantidad: c.cant, precioUnitario: c.precio })),
       });
-      toast.success("¡Comprobante Emitido!", { id: tId, description: "La venta se guardó exitosamente y el stock fue descontado." });
+      toast.success("¡Comprobante emitido!");
       setCarrito([]);
-      setClienteId(null);
-      setDocumentoCliente("");
+      setClienteId("");
+      setDocCliente("");
       setNombreCliente("");
-      router.refresh(); 
-    } catch (error: any) {
-      toast.error("Error al registrar venta: " + error.message, { id: tId });
+      setDescuento("");
+      setMontoRecibido("");
+      router.refresh();
+    } catch (err: any) {
+      toast.error(err.message || "Error al registrar venta");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)]">
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-heading font-bold text-foreground">Punto de Venta (POS)</h1>
-        <div className="flex space-x-2">
-           <button 
-             onClick={() => toast.info("Escáner no detectado", { description: "Conecta tu lector de código de barras USB." })}
-             className="glass-panel text-foreground px-4 py-2 rounded-lg text-sm font-bold flex items-center hover:bg-secondary transition-colors"
-           >
-            <ScanBarcode className="w-4 h-4 mr-2" /> Escanear
+    <div className="flex h-[calc(100vh-7rem)] gap-3 animate-fade-in">
+      {/* LEFT: Categories */}
+      <div className="hidden xl:flex flex-col w-28 shrink-0 gap-1.5 overflow-y-auto pr-1">
+        <button
+          onClick={() => setCatFilter(null)}
+          className={`px-2 py-2.5 rounded-xl text-xs font-bold text-center transition-all ${!catFilter ? "bg-primary text-white shadow-lg shadow-primary/30" : "glass-panel text-muted-foreground hover:text-foreground"}`}
+        >
+          Todos
+        </button>
+        {categorias.map(c => (
+          <button
+            key={c.id}
+            onClick={() => setCatFilter(c.id)}
+            className={`px-2 py-2.5 rounded-xl text-xs font-bold text-center transition-all truncate ${catFilter === c.id ? "bg-primary text-white shadow-lg shadow-primary/30" : "glass-panel text-muted-foreground hover:text-foreground"}`}
+          >
+            {c.nombre}
           </button>
+        ))}
+      </div>
+
+      {/* CENTER: Products */}
+      <div className="flex-1 flex flex-col min-w-0 glass rounded-2xl overflow-hidden">
+        <div className="p-3 border-b border-border/50 shrink-0">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Buscar producto, código o SKU..."
+              className="w-full bg-secondary/50 border-none rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 text-foreground placeholder:text-muted-foreground/50"
+            />
+          </div>
+          {/* Mobile cat filter */}
+          <div className="flex gap-1.5 mt-2 overflow-x-auto xl:hidden pb-1">
+            <button onClick={() => setCatFilter(null)} className={`px-3 py-1 rounded-lg text-xs font-bold whitespace-nowrap ${!catFilter ? "bg-primary text-white" : "bg-secondary text-muted-foreground"}`}>Todos</button>
+            {categorias.map(c => (
+              <button key={c.id} onClick={() => setCatFilter(c.id)} className={`px-3 py-1 rounded-lg text-xs font-bold whitespace-nowrap ${catFilter === c.id ? "bg-primary text-white" : "bg-secondary text-muted-foreground"}`}>{c.nombre}</button>
+            ))}
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto p-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-2.5">
+            {filtrados.map(p => (
+              <button
+                key={p.id}
+                onClick={() => addToCart(p)}
+                disabled={p.stock <= 0}
+                className={`flex flex-col rounded-xl border transition-all text-left group ${p.stock <= 0 ? "opacity-40 cursor-not-allowed border-border/30" : "border-border/50 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5 active:scale-[0.97]"}`}
+              >
+                <div className="h-16 bg-secondary/30 flex items-center justify-center text-lg font-bold text-muted-foreground/50 font-heading relative rounded-t-xl">
+                  {p.img}
+                  <span className={`absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold ${p.stock <= 5 ? "bg-red-500/20 text-red-400" : "bg-secondary text-muted-foreground"}`}>
+                    {p.stock}
+                  </span>
+                </div>
+                <div className="p-2.5">
+                  <p className="text-xs font-medium text-foreground line-clamp-2 leading-tight">{p.nombre}</p>
+                  <p className="text-primary font-bold text-sm mt-1">S/ {p.precio.toFixed(2)}</p>
+                </div>
+              </button>
+            ))}
+            {filtrados.length === 0 && (
+              <div className="col-span-full py-16 text-center text-muted-foreground text-sm">No se encontraron productos</div>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-6 flex-1 min-h-0">
-        {/* Catálogo Interactivo */}
-        <div className="flex-1 flex flex-col min-h-0 bg-background/30 rounded-2xl border border-border/50 overflow-hidden">
-          <div className="p-4 border-b border-border/50 bg-background/50 backdrop-blur-md">
-             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-              <input 
-                type="text" 
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Buscar productos en el catálogo..." 
-                className="w-full bg-secondary/50 border-none rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
-              />
-            </div>
+      {/* RIGHT: Cart + Payment */}
+      <div className="w-full sm:w-[340px] lg:w-[370px] flex flex-col glass rounded-2xl overflow-hidden shrink-0">
+        {/* Boleta/Factura Toggle */}
+        <div className="p-3 border-b border-border/50 space-y-2.5 shrink-0">
+          <div className="grid grid-cols-2 gap-1 bg-secondary/50 p-0.5 rounded-lg">
+            <button onClick={() => setTipoComprobante("BOLETA")} className={`py-1.5 text-xs font-bold rounded-md transition-all ${tipoComprobante === "BOLETA" ? "bg-primary text-white shadow" : "text-muted-foreground"}`}>BOLETA</button>
+            <button onClick={() => setTipoComprobante("FACTURA")} className={`py-1.5 text-xs font-bold rounded-md transition-all ${tipoComprobante === "FACTURA" ? "bg-primary text-white shadow" : "text-muted-foreground"}`}>FACTURA</button>
           </div>
-          
-          <div className="flex-1 overflow-y-auto p-4">
-            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4">
-              {filtrados.map((prod) => (
-                <motion.div 
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => addToCart(prod)}
-                  key={prod.id} 
-                  className={`glass-panel rounded-xl overflow-hidden cursor-pointer flex flex-col border transition-colors shadow-sm ${prod.stock <= 0 ? 'opacity-50 border-destructive/50' : 'border-border/50 hover:border-primary/50'}`}
-                >
-                  <div className="h-24 bg-secondary/30 flex items-center justify-center text-2xl font-bold text-muted-foreground font-heading relative">
-                    {prod.img}
-                    <div className="absolute top-2 right-2 bg-background/80 px-2 py-0.5 rounded text-xs font-bold border border-border/50">
-                      Stock: {prod.stock}
-                    </div>
-                  </div>
-                  <div className="p-3 bg-background/60">
-                    <p className="text-sm font-bold text-foreground line-clamp-1">{prod.nombre}</p>
-                    <p className="text-primary font-bold mt-1">S/ {prod.precio.toFixed(2)}</p>
-                  </div>
-                </motion.div>
-              ))}
-              {filtrados.length === 0 && (
-                <div className="col-span-full py-12 text-center text-muted-foreground">No se encontraron productos. Crea algunos en la pestaña Productos.</div>
-              )}
+          <select
+            value={clienteId}
+            onChange={e => { setClienteId(e.target.value); if (e.target.value) { setDocCliente(""); setNombreCliente(""); }}}
+            className="w-full bg-background border border-border/50 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+          >
+            <option value="">— Cliente Nuevo / General —</option>
+            {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre} ({c.documento})</option>)}
+          </select>
+          {!clienteId && (
+            <div className="grid grid-cols-2 gap-2">
+              <input type="text" placeholder={tipoComprobante === "FACTURA" ? "RUC" : "DNI"} value={docCliente} onChange={e => setDocCliente(e.target.value)} className="bg-background border border-border/50 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary" />
+              <input type="text" placeholder={tipoComprobante === "FACTURA" ? "Razón Social" : "Nombre"} value={nombreCliente} onChange={e => setNombreCliente(e.target.value)} className="bg-background border border-border/50 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary" />
             </div>
-          </div>
+          )}
         </div>
 
-        {/* Ticket / Carrito Interactivo */}
-        <div className="w-full lg:w-[400px] flex flex-col bg-background/30 border border-border/50 rounded-2xl overflow-hidden shadow-2xl shadow-black/20 shrink-0">
-          <div className="p-4 border-b border-border/50 bg-secondary/20 flex flex-col gap-3">
-            
-            <div className="grid grid-cols-2 gap-2 bg-background/50 p-1 rounded-lg border border-border/50">
-              <button onClick={() => setTipoComprobante("BOLETA")} className={`py-1.5 text-sm font-bold rounded-md transition-colors ${tipoComprobante === "BOLETA" ? "bg-primary text-primary-foreground shadow" : "text-muted-foreground hover:text-foreground"}`}>BOLETA</button>
-              <button onClick={() => setTipoComprobante("FACTURA")} className={`py-1.5 text-sm font-bold rounded-md transition-colors ${tipoComprobante === "FACTURA" ? "bg-primary text-primary-foreground shadow" : "text-muted-foreground hover:text-foreground"}`}>FACTURA</button>
+        {/* Cart Items */}
+        <div className="flex-1 overflow-y-auto p-3 space-y-2">
+          {carrito.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center text-muted-foreground/40 gap-2">
+              <ShoppingCart className="w-10 h-10" />
+              <p className="text-xs">Agrega productos al carrito</p>
             </div>
-
-            <div className="flex flex-col gap-2">
-              <label className="text-xs text-muted-foreground font-medium">Cliente (Buscar existente):</label>
-              <select 
-                value={clienteId || ""} 
-                onChange={e => {
-                  setClienteId(e.target.value || null);
-                  if (e.target.value) { setDocumentoCliente(""); setNombreCliente(""); }
-                }}
-                className="w-full bg-background border border-border/50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-              >
-                <option value="">Público en General / Nuevo</option>
-                {clientes.map(c => (
-                  <option key={c.id} value={c.id}>{c.nombre} ({c.documento})</option>
-                ))}
-              </select>
-            </div>
-
-            {!clienteId && (
-              <div className="grid grid-cols-2 gap-2 mt-2">
-                <div>
-                  <label className="text-xs text-muted-foreground font-medium block mb-1">{tipoComprobante === "FACTURA" ? "RUC" : "DNI"}:</label>
-                  <input 
-                    type="text" 
-                    placeholder={tipoComprobante === "FACTURA" ? "20000000001" : "12345678"} 
-                    value={documentoCliente} 
-                    onChange={e => setDocumentoCliente(e.target.value)}
-                    className="w-full bg-background border border-border/50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary" 
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground font-medium block mb-1">{tipoComprobante === "FACTURA" ? "Razón Social" : "Nombre"}:</label>
-                  <input 
-                    type="text" 
-                    placeholder={tipoComprobante === "FACTURA" ? "Empresa SAC" : "Juan Perez"} 
-                    value={nombreCliente} 
-                    onChange={e => setNombreCliente(e.target.value)}
-                    className="w-full bg-background border border-border/50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary" 
-                  />
-                </div>
+          ) : carrito.map(item => (
+            <div key={item.id} className="flex items-center gap-2 p-2 bg-secondary/20 rounded-lg border border-border/30 group">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-foreground truncate">{item.nombre}</p>
+                <p className="text-[10px] text-muted-foreground">S/ {item.precio.toFixed(2)} c/u</p>
               </div>
-            )}
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button onClick={() => updateQty(item.id, -1)} className="w-6 h-6 rounded bg-secondary flex items-center justify-center hover:bg-secondary/80 text-foreground"><Minus className="w-3 h-3" /></button>
+                <span className="text-xs font-bold w-5 text-center">{item.cant}</span>
+                <button onClick={() => updateQty(item.id, 1)} className="w-6 h-6 rounded bg-secondary flex items-center justify-center hover:bg-secondary/80 text-foreground"><Plus className="w-3 h-3" /></button>
+              </div>
+              <p className="text-xs font-bold text-foreground w-16 text-right">S/ {(item.cant * item.precio).toFixed(2)}</p>
+              <button onClick={() => removeItem(item.id)} className="text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-3.5 h-3.5" /></button>
+            </div>
+          ))}
+        </div>
+
+        {/* Totals + Payment */}
+        <div className="p-3 border-t border-border/50 space-y-2.5 bg-card/80 shrink-0 relative">
+          {loading && <div className="absolute inset-0 bg-card/80 backdrop-blur-sm z-10 flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>}
+          
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-muted-foreground">Descuento S/</span>
+            <input type="number" value={descuento} onChange={e => setDescuento(e.target.value)} placeholder="0.00" className="w-20 bg-background border border-border/50 rounded px-2 py-1 text-xs text-right focus:outline-none focus:ring-1 focus:ring-primary" />
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            {carrito.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
-                <ShoppingCart className="w-12 h-12 mb-3 opacity-20" />
-                <p>Carrito vacío</p>
-              </div>
-            ) : carrito.map((item) => (
-              <div key={item.id} className="flex justify-between items-center p-3 glass rounded-lg border border-border/30 group">
-                <div className="flex-1">
-                  <p className="font-bold text-sm text-foreground">{item.nombre}</p>
-                  <div className="flex items-center mt-2 space-x-2">
-                    <button onClick={() => updateCant(item.id, -1)} className="w-6 h-6 rounded bg-secondary flex items-center justify-center hover:bg-secondary/80"><Minus className="w-3 h-3" /></button>
-                    <span className="text-sm font-bold w-4 text-center">{item.cant}</span>
-                    <button onClick={() => updateCant(item.id, 1)} className="w-6 h-6 rounded bg-secondary flex items-center justify-center hover:bg-secondary/80"><Plus className="w-3 h-3" /></button>
-                    <span className="text-xs text-muted-foreground ml-2">x S/ {item.precio.toFixed(2)}</span>
-                  </div>
-                </div>
-                <div className="text-right flex flex-col items-end">
-                  <p className="font-bold text-foreground text-sm">S/ {(item.cant * item.precio).toFixed(2)}</p>
-                  <button onClick={() => updateCant(item.id, -item.cant)} className="text-destructive mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
+          <div className="space-y-1 text-xs">
+            <div className="flex justify-between text-muted-foreground"><span>Subtotal</span><span>S/ {subtotal.toFixed(2)}</span></div>
+            {descuentoVal > 0 && <div className="flex justify-between text-red-400"><span>Descuento</span><span>-S/ {descuentoVal.toFixed(2)}</span></div>}
+            <div className="flex justify-between text-muted-foreground"><span>IGV (18%)</span><span>S/ {igv.toFixed(2)}</span></div>
+            <div className="flex justify-between text-lg font-black text-foreground pt-1 border-t border-border/50">
+              <span>TOTAL</span>
+              <span className="text-primary">S/ {total.toFixed(2)}</span>
+            </div>
+          </div>
+
+          {/* Payment Methods */}
+          <div className="flex gap-1.5 flex-wrap">
+            {METODOS_PAGO.map(m => (
+              <button
+                key={m.id}
+                onClick={() => setMetodoPago(m.id)}
+                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all ${
+                  metodoPago === m.id 
+                    ? "bg-primary text-white shadow-lg shadow-primary/30" 
+                    : "bg-secondary/50 text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <m.icon className="w-3 h-3" />
+                {m.label}
+              </button>
             ))}
           </div>
 
-          <div className="p-4 bg-background border-t border-border/50 space-y-3 relative">
-            {loading && (
-              <div className="absolute inset-0 bg-background/50 backdrop-blur-sm z-10 flex items-center justify-center">
-                <Loader2 className="w-8 h-8 animate-spin text-primary" />
-              </div>
-            )}
-            <div className="flex justify-between text-sm text-muted-foreground">
-              <span>Subtotal</span>
-              <span>S/ {subtotal.toFixed(2)}</span>
+          {metodoPago === "EFECTIVO" && (
+            <div className="flex items-center gap-2">
+              <input type="number" placeholder="Monto recibido" value={montoRecibido} onChange={e => setMontoRecibido(e.target.value)} className="flex-1 bg-background border border-border/50 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary" />
+              {montoRec > 0 && <span className="text-xs font-bold text-emerald-400">Vuelto: S/ {vuelto.toFixed(2)}</span>}
             </div>
-            <div className="flex justify-between text-sm text-muted-foreground">
-              <span>IGV (18%)</span>
-              <span>S/ {igv.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between text-2xl font-heading font-black text-foreground pt-2 border-t border-border/50">
-              <span>Total</span>
-              <span className="text-primary">S/ {total.toFixed(2)}</span>
-            </div>
+          )}
 
-            <div className="grid grid-cols-2 gap-3 mt-4">
-              <button 
-                disabled={loading || carrito.length === 0}
-                onClick={() => emitirComprobante("EFECTIVO")}
-                className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 py-3 rounded-xl font-bold flex items-center justify-center hover:bg-emerald-500/20 transition-colors disabled:opacity-50"
-              >
-                <Banknote className="w-5 h-5 mr-2" /> Efectivo
-              </button>
-              <button 
-                disabled={loading || carrito.length === 0}
-                onClick={() => emitirComprobante("TARJETA")}
-                className="bg-blue-500/10 text-blue-500 border border-blue-500/20 py-3 rounded-xl font-bold flex items-center justify-center hover:bg-blue-500/20 transition-colors disabled:opacity-50"
-              >
-                <CreditCard className="w-5 h-5 mr-2" /> Tarjeta
-              </button>
-            </div>
-          </div>
+          <button
+            onClick={emitir}
+            disabled={loading || carrito.length === 0}
+            className="w-full bg-primary text-white py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-primary/90 transition-all shadow-[0_0_20px_rgba(124,58,237,0.3)] disabled:opacity-50 disabled:shadow-none"
+          >
+            <Receipt className="w-4 h-4" />
+            EMITIR {tipoComprobante}
+          </button>
         </div>
       </div>
     </div>

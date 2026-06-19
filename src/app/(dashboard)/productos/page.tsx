@@ -1,19 +1,32 @@
 import ProductosClient from "./productos-client";
-import { getProductos } from "@/actions/productos";
+import { getProductos, getCategorias, getMarcas } from "@/actions/productos";
 
 export default async function ProductosPage() {
-  const productos = await getProductos();
-  
-  // Transformar datos para el cliente
-  const data = productos.map(p => ({
+  const [productos, categorias, marcas] = await Promise.all([
+    getProductos(),
+    getCategorias(),
+    getMarcas(),
+  ]);
+
+  const data = productos.map((p: any) => ({
     id: p.id,
-    codigo: p.codigo,
+    codigo: p.codigo || "",
+    codigoBarras: p.codigoBarras || "",
     nombre: p.nombre,
-    categoria: p.categoria?.nombre || "General",
-    precio: Number(p.precioVenta),
-    stock: p.inventarios[0]?.stockActual || 0,
-    estado: p.inventarios[0]?.stockActual > 15 ? "Activo" : (p.inventarios[0]?.stockActual > 0 ? "Bajo Stock" : "Agotado")
+    descripcion: p.descripcion || "",
+    categoriaId: p.categoriaId || "",
+    categoriaNombre: p.categoria?.nombre || "Sin categoría",
+    marcaId: p.marcaId || "",
+    marcaNombre: p.marca?.nombre || "",
+    precioCompra: Number(p.precioCompra),
+    precioVenta: Number(p.precioVenta),
+    stock: p.inventarios?.[0]?.stockActual ?? 0,
+    stockMinimo: p.stockMinimo || 0,
+    estado: p.estado,
   }));
 
-  return <ProductosClient initialData={data} />;
+  const cats = categorias.map((c: any) => ({ id: c.id, nombre: c.nombre }));
+  const mrs = marcas.map((m: any) => ({ id: m.id, nombre: m.nombre }));
+
+  return <ProductosClient initialData={data} categorias={cats} marcas={mrs} />;
 }

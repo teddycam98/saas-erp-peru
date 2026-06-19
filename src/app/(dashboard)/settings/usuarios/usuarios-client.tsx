@@ -16,9 +16,10 @@ export default function UsuariosClient({ initialData, sucursales }: { initialDat
     setLoading(true);
     try {
       if (nuevoUser.id) {
-        await actualizarUsuario(nuevoUser.id, {
+        await actualizarUsuario({
+          id: nuevoUser.id,
           nombre: nuevoUser.nombre,
-          rol: nuevoUser.rol,
+          rolId: nuevoUser.rol,
           sucursalId: nuevoUser.sucursalId || null,
           password: nuevoUser.password, // Solo si escribio algo
         });
@@ -28,7 +29,7 @@ export default function UsuariosClient({ initialData, sucursales }: { initialDat
           nombre: nuevoUser.nombre,
           email: nuevoUser.email,
           password: nuevoUser.password,
-          rol: nuevoUser.rol,
+          rolId: nuevoUser.rol,
           sucursalId: nuevoUser.sucursalId || null,
         });
         toast.success("Usuario creado");

@@ -22,7 +22,7 @@ export default function SettingsClient({ initialData }: { initialData: any }) {
     if (!initialData?.id) return;
     setLoading(true);
     try {
-      await actualizarEmpresa(initialData.id, data);
+      await actualizarEmpresa(data);
       toast.success("Configuración actualizada correctamente", { description: "Los cambios han sido guardados en la base de datos." });
       router.refresh();
     } catch (error: any) {
