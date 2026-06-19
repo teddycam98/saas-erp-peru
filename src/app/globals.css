@@ -80,32 +80,36 @@
     @apply border-border;
   }
   body {
-    @apply font-sans antialiased selection:bg-primary/30;
-    background-color: #000000;
+    @apply font-sans antialiased selection:bg-primary/30 text-foreground;
+    background-color: #030406;
+    background-image: 
+      linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+    background-size: 40px 40px;
+    background-attachment: fixed;
   }
 
   .google-ai-bg {
     position: fixed;
-    top: -50%;
-    left: -50%;
-    width: 200%;
-    height: 200%;
+    top: 0;
+    left: -20%;
+    width: 140%;
+    height: 70vh;
     background-image: 
-      radial-gradient(circle at 50% 35%, rgba(0, 162, 255, 0.45) 0%, transparent 25%),
-      radial-gradient(circle at 65% 50%, rgba(255, 0, 128, 0.4) 0%, transparent 30%),
-      radial-gradient(circle at 35% 50%, rgba(0, 255, 136, 0.4) 0%, transparent 30%),
-      radial-gradient(circle at 50% 65%, rgba(255, 170, 0, 0.4) 0%, transparent 25%);
-    background-size: 100% 100%;
-    animation: rotateGlow 20s ease-in-out infinite alternate;
+      radial-gradient(circle at 25% 0%, rgba(0, 162, 255, 0.45) 0%, transparent 60%),
+      radial-gradient(circle at 45% -10%, rgba(255, 0, 128, 0.4) 0%, transparent 70%),
+      radial-gradient(circle at 75% 0%, rgba(255, 170, 0, 0.35) 0%, transparent 60%),
+      radial-gradient(circle at 35% 10%, rgba(0, 255, 136, 0.3) 0%, transparent 60%);
     z-index: -50;
     pointer-events: none;
-    filter: blur(80px);
+    filter: blur(70px);
+    animation: auroraShift 12s ease-in-out infinite alternate;
   }
 
-  @keyframes rotateGlow {
-    0% { transform: rotate(0deg) scale(1); }
-    50% { transform: rotate(180deg) scale(1.2); }
-    100% { transform: rotate(360deg) scale(1); }
+  @keyframes auroraShift {
+    0% { transform: translateX(-3%) scale(1); }
+    50% { transform: translateX(2%) scale(1.03); }
+    100% { transform: translateX(-1%) scale(1.05); }
   }
   h1, h2, h3, h4, h5, h6 {
     @apply font-heading tracking-tight;
