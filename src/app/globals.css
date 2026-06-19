@@ -91,25 +91,25 @@
 
   .google-ai-bg {
     position: fixed;
-    top: 0;
-    left: -20%;
-    width: 140%;
-    height: 70vh;
+    top: -10%;
+    left: -10%;
+    width: 120%;
+    height: 100vh;
     background-image: 
-      radial-gradient(circle at 25% 0%, rgba(0, 162, 255, 0.45) 0%, transparent 60%),
-      radial-gradient(circle at 45% -10%, rgba(255, 0, 128, 0.4) 0%, transparent 70%),
-      radial-gradient(circle at 75% 0%, rgba(255, 170, 0, 0.35) 0%, transparent 60%),
-      radial-gradient(circle at 35% 10%, rgba(0, 255, 136, 0.3) 0%, transparent 60%);
+      radial-gradient(ellipse at 15% 20%, rgba(0, 255, 100, 0.75) 0%, transparent 55%),
+      radial-gradient(circle at 35% 25%, rgba(255, 180, 0, 0.8) 0%, transparent 60%),
+      radial-gradient(ellipse at 60% 20%, rgba(255, 0, 100, 0.8) 0%, transparent 60%),
+      radial-gradient(circle at 85% 25%, rgba(0, 100, 255, 0.75) 0%, transparent 65%);
     z-index: -50;
     pointer-events: none;
-    filter: blur(70px);
-    animation: auroraShift 12s ease-in-out infinite alternate;
+    filter: blur(100px);
+    animation: auroraMovement 12s ease-in-out infinite alternate;
   }
 
-  @keyframes auroraShift {
-    0% { transform: translateX(-3%) scale(1); }
-    50% { transform: translateX(2%) scale(1.03); }
-    100% { transform: translateX(-1%) scale(1.05); }
+  @keyframes auroraMovement {
+    0% { transform: translate(-2%, -2%) scale(1); }
+    50% { transform: translate(3%, 3%) scale(1.08); }
+    100% { transform: translate(-1%, 1%) scale(1.15); }
   }
   h1, h2, h3, h4, h5, h6 {
     @apply font-heading tracking-tight;
